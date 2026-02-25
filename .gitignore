@@ -1,8 +1,15 @@
 # Huge simulation trace directories
 simfab_traces/
+cs_appliance_sdk/
+
+build/
 
 # Logs
 *.log
+*.so
+*.zip
+*.tar.gz
+*.bin
 
 # Large trace files without extensions
 stream0
