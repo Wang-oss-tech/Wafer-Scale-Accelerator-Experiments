@@ -1,0 +1,439 @@
+// SUMMA PE Program with Manual Multicasting
+//
+// Implements SUMMA matrix multiplication using runtime routing configuration.
+// At each step k:
+//   - PE at column k broadcasts A tile to its row (horizontal)
+//   - PE at row k broadcasts B tile to its column (vertical)
+//   - All PEs compute C += A * B
+
+param memcpy_params: comptime_struct;
+param P: u16;
+param Mt: i16;
+param Kt: i16;
+param Nt: i16;
+
+param a_color: color;
+param b_color: color;
+param EXIT_TASK_ID: local_task_id;
+param A_DONE_TASK_ID: local_task_id;
+param B_DONE_TASK_ID: local_task_id;
+param COMPUTE_TASK_ID: local_task_id;
+
+// Import memcpy for host communication
+const sys_mod = @import_module("<memcpy/memcpy>", memcpy_params);
+
+// Import layout module to get PE coordinates
+const layout_mod = @import_module("<layout>");
+
+// Import simprint for debugging
+const prt = @import_module("<simprint>");
+
+// Import timestamp for cycle-count instrumentation
+const timestamp = @import_module("<time>");
+
+// ============================================================================
+// Color Config Register Access (from wse2_color_config.csl)
+// ============================================================================
+const tile_config = @import_module("<tile_config>");
+const word_size = tile_config.target.word_size;
+const addresses = tile_config.target.addresses;
+
+fn get_color_config_addr(c: color) u16 {
+    return @as(u16, addresses.COLOR_CONFIG) + @get_int(c) * word_size;
+}
+
+// Mask to clear input/output bits (bits 9:0), preserve control bits (15:10)
+const MASK_CLEAR_IO: u16 = 0xfc00;
+
+// Input bits (pick ONE) - bits 9:5
+const INPUT_RAMP:  u16 = 0x200;  // bit 9
+const INPUT_NORTH: u16 = 0x100;  // bit 8
+const INPUT_SOUTH: u16 = 0x080;  // bit 7
+const INPUT_EAST:  u16 = 0x040;  // bit 6
+const INPUT_WEST:  u16 = 0x020;  // bit 5
+
+// Output bits (can combine) - bits 4:0
+const OUTPUT_RAMP:  u16 = 0x10;  // bit 4
+const OUTPUT_NORTH: u16 = 0x08;  // bit 3
+const OUTPUT_SOUTH: u16 = 0x04;  // bit 2
+const OUTPUT_EAST:  u16 = 0x02;  // bit 1
+const OUTPUT_WEST:  u16 = 0x01;  // bit 0
+
+// ============================================================================
+// PE State
+// ============================================================================
+
+// PE coordinates
+var px: u16 = 0;
+var py: u16 = 0;
+
+// Current SUMMA step
+var step: u16 = 0;
+
+// Home tiles (populated by host)
+var A_tile = @zeros([Mt * Kt]f32);
+var B_tile = @zeros([Kt * Nt]f32);
+var C_tile = @zeros([Mt * Nt]f32);
+
+// Receive buffers for broadcast data
+var A_recv = @zeros([Mt * Kt]f32);
+var B_recv = @zeros([Kt * Nt]f32);
+
+// Pointers for export
+var ptr_A: [*]f32 = &A_tile;
+var ptr_B: [*]f32 = &B_tile;
+var ptr_C: [*]f32 = &C_tile;
+
+// Color config register addresses
+var a_color_addr: u16 = 0;
+var b_color_addr: u16 = 0;
+
+// Fabric DSDs for communication
+var fab_a_out = @get_dsd(fabout_dsd, .{ .extent = Mt * Kt, .fabric_color = a_color, .output_queue = @get_output_queue(2) });
+var fab_a_in  = @get_dsd(fabin_dsd,  .{ .extent = Mt * Kt, .fabric_color = a_color, .input_queue = @get_input_queue(2) });
+var fab_b_out = @get_dsd(fabout_dsd, .{ .extent = Kt * Nt, .fabric_color = b_color, .output_queue = @get_output_queue(3) });
+var fab_b_in  = @get_dsd(fabin_dsd,  .{ .extent = Kt * Nt, .fabric_color = b_color, .input_queue = @get_input_queue(3) });
+
+// Memory DSDs
+var mem_A_tile = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt * Kt} -> A_tile[i] });
+var mem_A_recv = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt * Kt} -> A_recv[i] });
+var mem_B_tile = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Kt * Nt} -> B_tile[i] });
+var mem_B_recv = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Kt * Nt} -> B_recv[i] });
+
+// Flags for synchronization
+var a_done: bool = false;
+var b_done: bool = false;
+
+// Timestamp buffers for performance (48-bit cycle count = 3 u16 words)
+var tscStartBuffer = @zeros([timestamp.tsc_size_words]u16);
+var tscEndBuffer = @zeros([timestamp.tsc_size_words]u16);
+var tscRefBuffer = @zeros([timestamp.tsc_size_words]u16);
+var time_buf_f32 = @zeros([3]f32);
+var ptr_time_memcpy: [*]f32 = &time_buf_f32;
+var time_ref_f32 = @zeros([2]f32);
+var ptr_time_ref: [*]f32 = &time_ref_f32;
+
+// ============================================================================
+// Routing Configuration
+// ============================================================================
+
+// Configure a_color for row broadcast with root at column k
+fn configure_row_broadcast(k: u16) void {
+    // prt.print_string("Configuring row broadcast");
+    // prt.print_u16_decimal(px);
+    // prt.print_u16_decimal(py);
+    // prt.print_string("\n");
+
+    var r_state: u16 = @bitcast(*u16, a_color_addr).*;
+    r_state = r_state & MASK_CLEAR_IO;
+
+    if (px == k) {
+        // I am the ROOT - send from RAMP
+        if (k == 0) {
+            // Leftmost column: send EAST only
+            r_state = r_state | INPUT_RAMP | OUTPUT_EAST;
+        } else if (k == P - 1) {
+            // Rightmost column: send WEST only
+            r_state = r_state | INPUT_RAMP | OUTPUT_WEST;
+        } else {
+            // Middle: send both directions
+            r_state = r_state | INPUT_RAMP | OUTPUT_EAST | OUTPUT_WEST;
+        }
+    } else if (px < k) {
+        // I am LEFT of root - receive from EAST
+        if (px == 0) {
+            // Leftmost: consume only
+            r_state = r_state | INPUT_EAST | OUTPUT_RAMP;
+        } else {
+            // Forward WEST + consume
+            r_state = r_state | INPUT_EAST | OUTPUT_RAMP | OUTPUT_WEST;
+        }
+    } else {
+        // I am RIGHT of root - receive from WEST
+        if (px == P - 1) {
+            // Rightmost: consume only
+            r_state = r_state | INPUT_WEST | OUTPUT_RAMP;
+        } else {
+            // Forward EAST + consume
+            r_state = r_state | INPUT_WEST | OUTPUT_RAMP | OUTPUT_EAST;
+        }
+    }
+
+    @block(a_color);
+    @bitcast(*u16, a_color_addr).* = r_state;
+    // prt.print_string("Finished row broadcast");
+    // prt.print_u16_decimal(px);
+    // // prt.print_string(",");
+    // prt.print_u16_decimal(py);
+    // prt.print_string("\n");
+}
+
+// Configure b_color for column broadcast with root at row k
+fn configure_col_broadcast(k: u16) void {
+    var r_state: u16 = @bitcast(*u16, b_color_addr).*;
+    r_state = r_state & MASK_CLEAR_IO;
+
+    if (py == k) {
+        // I am the ROOT - send from RAMP
+        if (k == 0) {
+            // Top row: send SOUTH only
+            r_state = r_state | INPUT_RAMP | OUTPUT_SOUTH;
+        } else if (k == P - 1) {
+            // Bottom row: send NORTH only
+            r_state = r_state | INPUT_RAMP | OUTPUT_NORTH;
+        } else {
+            // Middle: send both directions
+            r_state = r_state | INPUT_RAMP | OUTPUT_SOUTH | OUTPUT_NORTH;
+        }
+    } else if (py < k) {
+        // I am ABOVE root - receive from SOUTH
+        if (py == 0) {
+            // Top row: consume only
+            r_state = r_state | INPUT_SOUTH | OUTPUT_RAMP;
+        } else {
+            // Forward NORTH + consume
+            r_state = r_state | INPUT_SOUTH | OUTPUT_RAMP | OUTPUT_NORTH;
+        }
+    } else {
+        // I am BELOW root - receive from NORTH
+        if (py == P - 1) {
+            // Bottom row: consume only
+            r_state = r_state | INPUT_NORTH | OUTPUT_RAMP;
+        } else {
+            // Forward SOUTH + consume
+            r_state = r_state | INPUT_NORTH | OUTPUT_RAMP | OUTPUT_SOUTH;
+        }
+    }
+
+    @block(b_color);
+    @bitcast(*u16, b_color_addr).* = r_state;
+}
+
+// ============================================================================
+// Broadcast Tasks
+// ============================================================================
+
+task a_done_task() void {
+    a_done = true;
+    if (b_done) {
+        @activate(COMPUTE_TASK_ID);
+    }
+}
+
+task b_done_task() void {
+    b_done = true;
+    if (a_done) {
+        @activate(COMPUTE_TASK_ID);
+    }
+}
+
+fn do_broadcast_A() void {
+    // prt.print_string("Starting A broadcast ");
+    // prt.print_u16_decimal(step);
+    // prt.print_string(" at location ");
+    // prt.print_u16_decimal(px);
+    // prt.print_string(",");
+    // prt.print_u16_decimal(py);
+    // prt.print_string("\n");
+    
+    // Colors stay blocked - fabin requires blocked color to read from queue
+    if (px == step) {
+        // I am root: send my A_tile
+        @fmovs(fab_a_out, mem_A_tile, .{ .async = true, .activate = A_DONE_TASK_ID });
+    } else {
+        // Receive into A_recv buffer
+        @fmovs(mem_A_recv, fab_a_in, .{ .async = true, .activate = A_DONE_TASK_ID });
+    }
+}
+
+fn do_broadcast_B() void {
+    // prt.print_string("Starting B broadcast ");
+    // prt.print_u16_decimal(step);
+    // prt.print_string(" at location ");
+    // prt.print_u16_decimal(px);
+    // prt.print_string(",");
+    // prt.print_u16_decimal(py);
+    // prt.print_string("\n");
+    
+    // Colors stay blocked - fabin requires blocked color to read from queue
+    if (py == step) {
+        // I am root: send my B_tile
+        @fmovs(fab_b_out, mem_B_tile, .{ .async = true, .activate = B_DONE_TASK_ID });
+    } else {
+        // Receive into B_recv buffer
+        @fmovs(mem_B_recv, fab_b_in, .{ .async = true, .activate = B_DONE_TASK_ID });
+    }
+}
+
+// ============================================================================
+// Compute Task
+// ============================================================================
+
+task compute_task() void {
+    // prt.print_string("Starting GEMM ");
+    // prt.print_u16_decimal(step);
+    // prt.print_string(" location ");
+    // prt.print_u16_decimal(px);
+    // prt.print_string(",");
+    // prt.print_u16_decimal(py);
+    // prt.print_string("\n");
+    
+    // Get pointers to A and B data for this step
+    const Ap: [*]f32 = if (px == step) &A_tile else &A_recv;
+    const Bp: [*]f32 = if (py == step) &B_tile else &B_recv;
+
+    // Local GEMM: C += A * B using fmacs
+    var A_dsd = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt} -> A_tile[i] });
+    A_dsd = @set_dsd_base_addr(A_dsd, Ap);
+
+    for (@range(i16, Kt)) |k| {
+        var C_dsd = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt} -> C_tile[i] });
+
+        for (@range(i16, Nt)) |j| {
+            const b = Bp[@as(u16, j) * @as(u16, Kt) + @as(u16, k)];
+            @fmacs(C_dsd, C_dsd, A_dsd, b);
+            C_dsd = @increment_dsd_offset(C_dsd, Mt, f32);
+        }
+        A_dsd = @increment_dsd_offset(A_dsd, Mt, f32);
+    }
+
+    // prt.print_string("Ending GEMM ");
+    // prt.print_u16_decimal(step);
+    // prt.print_string(" location ");
+    // prt.print_u16_decimal(px);
+    // prt.print_string(",");
+    // prt.print_u16_decimal(py);
+    // prt.print_string("\n");
+    
+    // Move to next step
+    step += 1;
+
+    // Colors stay blocked throughout - no need to re-block
+
+    if (step < P) {
+        // Continue to next SUMMA step
+        summa_step();
+    } else {
+        // Done - unblock command stream
+        @activate(EXIT_TASK_ID);
+    }
+}
+
+// ============================================================================
+// Main Entry Point
+// ============================================================================
+
+fn summa_step() void {
+    // prt.print_string("Starting broadcast ");
+    // prt.print_u16_decimal(step);
+    // prt.print_string(" at location ");
+    // prt.print_u16_decimal(px);
+    // prt.print_string(",");
+    // prt.print_u16_decimal(py);
+    // prt.print_string("\n");
+    
+    // Reset synchronization flags
+    a_done = false;
+    b_done = false;
+
+    // Configure routing for current step
+    configure_row_broadcast(step);
+    configure_col_broadcast(step);
+    
+    // prt.print_string("Configured broadcast ");
+    // prt.print_u16_decimal(step);
+    // prt.print_string(" at location ");
+    // prt.print_u16_decimal(px);
+    // prt.print_string(",");
+    // prt.print_u16_decimal(py);
+    // prt.print_string("\n");
+
+    // Start both broadcasts
+    do_broadcast_A();
+    do_broadcast_B();
+}
+
+fn main() void {
+    // Initialize PE coordinates
+    px = @as(u16, layout_mod.get_x_coord());
+    py = @as(u16, layout_mod.get_y_coord());
+
+    // Get color config register addresses
+    a_color_addr = get_color_config_addr(a_color);
+    b_color_addr = get_color_config_addr(b_color);
+
+    // Initialize step counter
+    step = 0;
+
+    // Record timestamps for performance (ref and start before SUMMA)
+    timestamp.enable_tsc();
+    timestamp.get_timestamp(&tscRefBuffer);
+    timestamp.get_timestamp(&tscStartBuffer);
+ 
+    // Start first SUMMA step
+    summa_step();
+}
+
+fn f_memcpy_timestamps() void {
+    var lo_: u16 = 0;
+    var hi_: u16 = 0;
+
+    lo_ = tscStartBuffer[0];
+    hi_ = tscStartBuffer[1];
+    time_buf_f32[0] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+
+    lo_ = tscStartBuffer[2];
+    hi_ = tscEndBuffer[0];
+    time_buf_f32[1] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+
+    lo_ = tscEndBuffer[1];
+    hi_ = tscEndBuffer[2];
+    time_buf_f32[2] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+}
+
+fn f_reference_timestamps() void {
+    var lo_: u16 = 0;
+    var hi_: u16 = 0;
+
+    lo_ = tscRefBuffer[0];
+    hi_ = tscRefBuffer[1];
+    time_ref_f32[0] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+
+    lo_ = tscRefBuffer[2];
+    hi_ = 0;
+    time_ref_f32[1] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+}
+
+task exit_task() void {
+    timestamp.get_timestamp(&tscEndBuffer);
+    timestamp.disable_tsc();
+    f_reference_timestamps();
+    f_memcpy_timestamps();
+
+    sys_mod.unblock_cmd_stream();
+}
+
+// ============================================================================
+// Comptime Setup
+// ============================================================================
+
+comptime {
+    // Block colors at comptime - they stay blocked throughout
+    // This ensures fabin reads from queue instead of triggering tasks
+    @block(a_color);
+    @block(b_color);
+
+    // Bind tasks
+    @bind_local_task(a_done_task, A_DONE_TASK_ID);
+    @bind_local_task(b_done_task, B_DONE_TASK_ID);
+    @bind_local_task(compute_task, COMPUTE_TASK_ID);
+    @bind_local_task(exit_task, EXIT_TASK_ID);
+
+    // Export symbols
+    @export_symbol(ptr_A, "A");
+    @export_symbol(ptr_B, "B");
+    @export_symbol(ptr_C, "C");
+    @export_symbol(ptr_time_memcpy, "time_memcpy");
+    @export_symbol(ptr_time_ref, "time_ref");
+    @export_symbol(main);
+}

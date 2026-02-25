@@ -1,0 +1,72 @@
+Start compiling: 2026-02-24 21:23:42
+Event 2026-02-24 21:25:22 +0000 UTC reason=InconsistentVersion wsjob=wsjob-ffvhpjzxjhhxh9jrfttzyg message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-02-24 21:29:10,607 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-02-24 21:29:22
+Event 2026-02-24 21:29:24 +0000 UTC reason=InconsistentVersion wsjob=wsjob-ovnhefxxkityfkh2psrgxh message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Traceback (most recent call last):
+  File "/home/william_wang_yale/R_2.6.0/csl-examples/experiments/WaferLLM/MeshGEMM/WSE-3/appliance_launch.py", line 48, in <module>
+    response = launcher.run(f"cs_python run.py {run_args} --cmaddr %CMADDR%")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/cerebras/sdk/client/sdk_appliance_client.py", line 698, in run
+    self._check_sdk_response(response, "SdkLauncher running command(s) ")
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/cerebras/sdk/client/sdk_appliance_client.py", line 588, in _check_sdk_response
+    raise RuntimeError(
+RuntimeError: SdkLauncher.run() command error:
+WARNING: The message system is being used before initialization.
+         Messages will still be printed, but with limited support.
+COUT034   Latest HIOLIB used
+COUT034  TCP connect to: 10.254.2.67:9000
+COUT034  No credentials found, disabling TLS
+COUT034  TLS is disabled
+COUT034  TLS disabled
+COUT034  Poll
+COUT034  TCP connected
+COUT034  Connection successful
+COUT034  Local addr: 10.125.8.217:36336
+COUT034  hio_ctl:HRQ_HANDSHAKE 16247 us
+COUT034  TCP connect to: 10.254.2.67:9000
+COUT034  TLS disabled
+COUT034  Poll
+COUT034  TCP connected
+COUT034  Connection successful
+COUT034  Local addr: 10.125.8.217:36352
+COUT034  hio_ctl:HRQ_HANDSHAKE 53446 us
+COUT034  hio_ctl:HRQ_GETFABRIC 197 us
+HAAP425 21:31:30 GMT  WARNING: hio_group_program is deprecated, use hio_flows_program
+COUT002 21:31:30 GMT  ERROR: LOGGER NOT INITIALIZED:
+COUT002 21:31:30 GMT  ERROR: 		wio_groups.json is deprecated, use wio_flows.json instead
+HWKA425 21:31:58 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 1 streamer 0 P:0 C:10 (10.254.3.50:12, 10.254.3.56:12, 10.254.3.62:12, 10.254.3.68:12) mode: RoCE
+HWKA425 21:31:59 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 0 streamer 0 P:1 C:22 (10.254.3.52:24, 10.254.3.58:24, 10.254.3.64:24, 10.254.3.70:24) mode: RoCE
+HWKA425 21:31:59 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 3 streamer 0 P:2 C:6 (10.254.3.54:8, 10.254.3.60:8, 10.254.3.66:8, 10.254.3.72:8) mode: RoCE
+HWKA425 21:32:00 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened egress stream flow 2 streamer 0 P:0 C:90 (10.254.3.50:92, 10.254.3.56:92, 10.254.3.62:92, 10.254.3.68:92) mode: RoCE
+Traceback (most recent call last):
+  File "/n1/wsjob/workdir/job-operator/wsjob-ovnhefxxkityfkh2psrgxh/worker-0/cs_0e9791204ff93d9aedba053edf06214be3ec04ed80f382da42a7bd1b29483cbc/run.py", line 167, in <module>
+    np.testing.assert_allclose(res, C_expected, rtol=f16_rtol, atol=f16_atol)
+  File "/python/python-x86_64/lib/python3.11/site-packages/numpy/testing/_private/utils.py", line 1508, in assert_allclose
+    assert_array_compare(compare, actual, desired, err_msg=str(err_msg),
+  File "/cb/toolchains/buildroot/buildroot-all/main/202511051558-105-950be787/monolith/rootfs-x86_64/usr/lib/python3.11/contextlib.py", line 81, in inner
+    return func(*args, **kwds)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/python/python-x86_64/lib/python3.11/site-packages/numpy/testing/_private/utils.py", line 801, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Not equal to tolerance rtol=0.05, atol=172.8
+
+Mismatched elements: 74649600 / 74649600 (100%)
+Max absolute difference: 588.
+Max relative difference: 0.2734
+ x: array([[1671., 1691., 1649., ..., 1649., 1657., 1652.],
+       [1639., 1661., 1642., ..., 1658., 1648., 1656.],
+       [1696., 1703., 1644., ..., 1662., 1646., 1633.],...
+ y: array([[2186., 2176., 2166., ..., 2170., 2156., 2182.],
+       [2176., 2150., 2158., ..., 2146., 2134., 2150.],
+       [2188., 2164., 2158., ..., 2170., 2154., 2156.],...
+

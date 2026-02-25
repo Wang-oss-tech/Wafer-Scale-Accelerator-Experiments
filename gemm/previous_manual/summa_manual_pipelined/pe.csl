@@ -1,0 +1,536 @@
+// 2D SUMMA PE Program - Pipelined Version with Double Buffering
+//
+// Pipeline structure (WSE-3 with overlap):
+//   Time:     T0        T1        T2        T3        T4        T5
+//   Fabric:   [Bcast 0 ][Bcast 1 ][Bcast 2 ][Bcast 3 ]
+//   Compute:            [Compute0][Compute1][Compute2][Compute3]
+//
+// On WSE-2: sequential (no overlap) due to DSR conflicts
+// On WSE-3: overlapped using explicit microthread IDs
+//
+// Bcast[k] uses buf[k % 2], Compute[k] uses buf[k % 2]
+
+param memcpy_params: comptime_struct;
+param P: u16;
+param Mt: u16;
+param Kt: u16;
+param Nt: u16;
+param east_color: color;
+param west_color: color;
+param south_color: color;
+param north_color: color;
+
+const sys_mod = @import_module("<memcpy/memcpy>", memcpy_params);
+const layout_mod = @import_module("<layout>");
+
+// Tile sizes
+const A_size: u16 = Mt * Kt;
+const B_size: u16 = Kt * Nt;
+const C_size: u16 = Mt * Nt;
+
+// Task IDs 
+const main_task_id: local_task_id = @get_local_task_id(8);
+const compute_task_id: local_task_id = @get_local_task_id(9);
+const recv_A_done_task_id: local_task_id = @get_local_task_id(10);
+const recv_B_done_task_id: local_task_id = @get_local_task_id(11);
+const start_B_task_id: local_task_id = @get_local_task_id(13);
+const compute_done_task_id: local_task_id = @get_local_task_id(14);
+const start_next_bcast_task_id: local_task_id = @get_local_task_id(15);  // For overlap
+const EXIT: local_task_id = @get_local_task_id(12);
+
+// Queues
+const east_oq: output_queue = @get_output_queue(2);
+const west_oq: output_queue = @get_output_queue(3);
+const south_oq: output_queue = @get_output_queue(4);
+const north_oq: output_queue = @get_output_queue(5);
+const east_iq: input_queue = @get_input_queue(2);
+const west_iq: input_queue = @get_input_queue(3);
+const south_iq: input_queue = @get_input_queue(4);
+const north_iq: input_queue = @get_input_queue(5);
+
+// WSE-3: Explicit microthread IDs for overlap
+// Different IDs allow A receive and B receive to run concurrently
+const A_recv_ut = if (@is_arch("wse3")) @get_ut_id(0) else {};
+const B_recv_ut = if (@is_arch("wse3")) @get_ut_id(1) else {};
+
+// ============================================================
+// Data storage with DOUBLE BUFFERING
+// ============================================================
+
+// Home tiles (initialized by host)
+var A_tile: [A_size]f32;
+var B_tile: [B_size]f32;
+var C_tile: [C_size]f32;
+
+// Double buffers for received broadcasts
+var A_buf0: [A_size]f32;  // For steps 0, 2, 4, ...
+var A_buf1: [A_size]f32;  // For steps 1, 3, 5, ...
+var B_buf0: [B_size]f32;  // For steps 0, 2, 4, ...
+var B_buf1: [B_size]f32;  // For steps 1, 3, 5, ...
+
+// Pointers for export
+var ptr_A: [*]f32 = &A_tile;
+var ptr_B: [*]f32 = &B_tile;
+const ptr_C: [*]f32 = &C_tile;
+
+// ============================================================
+// Pipeline State
+// ============================================================
+
+var px: u16 = 0;
+var py: u16 = 0;
+
+// Broadcast state
+var bcast_step: u16 = 0;       // Which step we're broadcasting (0..P-1)
+var bcast_buf: u16 = 0;        // Which buffer: 0 or 1
+var A_bcast_done: bool = false;
+var B_bcast_done: bool = false;
+
+// Compute state  
+var compute_step: u16 = 0;     // Which step we're computing (0..P-1)
+var computing: bool = false;   // Is compute currently running?
+
+// Buffer readiness: data_ready[buf] = true when both A and B received
+var data_ready_0: bool = false;
+var data_ready_1: bool = false;
+
+fn get_px() u16 {
+  return @as(u16, layout_mod.get_x_coord());
+}
+
+fn get_py() u16 {
+  return @as(u16, layout_mod.get_y_coord());
+}
+
+// ============================================================
+// Helper: get buffer pointers based on buffer index
+// ============================================================
+
+fn get_A_buffer(buf: u16) [*]f32 {
+  if (buf == 0) {
+    return @ptrcast([*]f32, &A_buf0);
+  } else {
+    return @ptrcast([*]f32, &A_buf1);
+  }
+}
+
+fn get_B_buffer(buf: u16) [*]f32 {
+  if (buf == 0) {
+    return @ptrcast([*]f32, &B_buf0);
+  } else {
+    return @ptrcast([*]f32, &B_buf1);
+  }
+}
+
+fn set_data_ready(buf: u16, val: bool) void {
+  if (buf == 0) {
+    data_ready_0 = val;
+  } else {
+    data_ready_1 = val;
+  }
+}
+
+fn get_data_ready(buf: u16) bool {
+  if (buf == 0) {
+    return data_ready_0;
+  } else {
+    return data_ready_1;
+  }
+}
+
+// ============================================================
+// A broadcast - horizontal (column broadcasts to row)
+// ============================================================
+
+fn setup_recv_A_from_west(buf: u16) void {
+  const in_dsd = @get_dsd(fabin_dsd, .{
+    .fabric_color = east_color,
+    .extent = A_size,
+    .input_queue = east_iq,
+  });
+  const out_dsd = @get_dsd(mem1d_dsd, .{
+    .base_address = get_A_buffer(buf),
+    .extent = A_size,
+  });
+  if (@is_arch("wse3")) {
+    @mov32(out_dsd, in_dsd, .{ .async = true, .ut_id = A_recv_ut, .activate = recv_A_done_task_id });
+  } else {
+    @mov32(out_dsd, in_dsd, .{ .async = true, .activate = recv_A_done_task_id });
+  }
+}
+
+fn setup_recv_A_from_east(buf: u16) void {
+  const in_dsd = @get_dsd(fabin_dsd, .{
+    .fabric_color = west_color,
+    .extent = A_size,
+    .input_queue = west_iq,
+  });
+  const out_dsd = @get_dsd(mem1d_dsd, .{
+    .base_address = get_A_buffer(buf),
+    .extent = A_size,
+  });
+  if (@is_arch("wse3")) {
+    @mov32(out_dsd, in_dsd, .{ .async = true, .ut_id = A_recv_ut, .activate = recv_A_done_task_id });
+  } else {
+    @mov32(out_dsd, in_dsd, .{ .async = true, .activate = recv_A_done_task_id });
+  }
+}
+
+fn send_A_east() void {
+  const in_dsd = @get_dsd(mem1d_dsd, .{
+    .base_address = &A_tile,
+    .extent = A_size,
+  });
+  const out_dsd = @get_dsd(fabout_dsd, .{
+    .fabric_color = east_color,
+    .extent = A_size,
+    .output_queue = east_oq,
+  });
+  @mov32(out_dsd, in_dsd);  // blocking
+}
+
+fn send_A_west() void {
+  const in_dsd = @get_dsd(mem1d_dsd, .{
+    .base_address = &A_tile,
+    .extent = A_size,
+  });
+  const out_dsd = @get_dsd(fabout_dsd, .{
+    .fabric_color = west_color,
+    .extent = A_size,
+    .output_queue = west_oq,
+  });
+  @mov32(out_dsd, in_dsd);  // blocking
+}
+
+fn do_A_broadcast() void {
+  const step = bcast_step;
+  const buf = bcast_buf;
+  
+  if (px == step) {
+    // Source column
+    if (px < P - 1) {
+      setup_recv_A_from_west(buf);
+      send_A_east();
+    }
+    if (px > 0) {
+      setup_recv_A_from_east(buf);
+      send_A_west();
+    }
+
+    if (P == 1) {
+      // Single PE - copy directly
+      const src = @ptrcast([*]f32, &A_tile);
+      const dst = get_A_buffer(buf);
+      for (@range(u16, A_size)) |i| {
+        dst[i] = src[i];
+      }
+      A_bcast_done = true;
+    }
+  } else if (px < step) {
+    // Left of source - receive from east
+    setup_recv_A_from_east(buf);
+  } else {
+    // Right of source - receive from west
+    setup_recv_A_from_west(buf);
+  }
+}
+
+// ============================================================
+// B broadcast - vertical (row broadcasts to column)
+// ============================================================
+
+fn setup_recv_B_from_north(buf: u16) void {
+  const in_dsd = @get_dsd(fabin_dsd, .{
+    .fabric_color = south_color,
+    .extent = B_size,
+    .input_queue = south_iq,
+  });
+  const out_dsd = @get_dsd(mem1d_dsd, .{
+    .base_address = get_B_buffer(buf),
+    .extent = B_size,
+  });
+  if (@is_arch("wse3")) {
+    @mov32(out_dsd, in_dsd, .{ .async = true, .ut_id = B_recv_ut, .activate = recv_B_done_task_id });
+  } else {
+    @mov32(out_dsd, in_dsd, .{ .async = true, .activate = recv_B_done_task_id });
+  }
+}
+
+fn setup_recv_B_from_south(buf: u16) void {
+  const in_dsd = @get_dsd(fabin_dsd, .{
+    .fabric_color = north_color,
+    .extent = B_size,
+    .input_queue = north_iq,
+  });
+  const out_dsd = @get_dsd(mem1d_dsd, .{
+    .base_address = get_B_buffer(buf),
+    .extent = B_size,
+  });
+  if (@is_arch("wse3")) {
+    @mov32(out_dsd, in_dsd, .{ .async = true, .ut_id = B_recv_ut, .activate = recv_B_done_task_id });
+  } else {
+    @mov32(out_dsd, in_dsd, .{ .async = true, .activate = recv_B_done_task_id });
+  }
+}
+
+fn send_B_south() void {
+  const in_dsd = @get_dsd(mem1d_dsd, .{
+    .base_address = &B_tile,
+    .extent = B_size,
+  });
+  const out_dsd = @get_dsd(fabout_dsd, .{
+    .fabric_color = south_color,
+    .extent = B_size,
+    .output_queue = south_oq,
+  });
+  @mov32(out_dsd, in_dsd);  // blocking
+}
+
+fn send_B_north() void {
+  const in_dsd = @get_dsd(mem1d_dsd, .{
+    .base_address = &B_tile,
+    .extent = B_size,
+  });
+  const out_dsd = @get_dsd(fabout_dsd, .{
+    .fabric_color = north_color,
+    .extent = B_size,
+    .output_queue = north_oq,
+  });
+  @mov32(out_dsd, in_dsd);  // blocking
+}
+
+fn do_B_broadcast() void {
+  const step = bcast_step;
+  const buf = bcast_buf;
+  
+  if (py == step) {
+    // Source row
+    if (py < P - 1) {
+      setup_recv_B_from_north(buf);
+      send_B_south();
+    }
+    if (py > 0) {
+      setup_recv_B_from_south(buf);
+      send_B_north();
+    }
+
+    if (P == 1) {
+      // Single PE - copy directly
+      const src = @ptrcast([*]f32, &B_tile);
+      const dst = get_B_buffer(buf);
+      for (@range(u16, B_size)) |i| {
+        dst[i] = src[i];
+      }
+      B_bcast_done = true;
+    }
+  } else if (py < step) {
+    // Above source - receive from south
+    setup_recv_B_from_south(buf);
+  } else {
+    // Below source - receive from north
+    setup_recv_B_from_north(buf);
+  }
+}
+
+// ============================================================
+// Pipeline synchronization
+// ============================================================
+
+task recv_A_done() void {
+  A_bcast_done = true;
+  // Start B broadcast (still sequential A then B within a step)
+  @activate(start_B_task_id);
+}
+
+task start_B() void {
+  do_B_broadcast();
+  // If source PE (for single PE case), check immediately
+  if (B_bcast_done) {
+    handle_bcast_complete();
+  }
+}
+
+task recv_B_done() void {
+  B_bcast_done = true;
+  handle_bcast_complete();
+}
+
+fn handle_bcast_complete() void {
+  // Mark this buffer as having complete data
+  set_data_ready(bcast_buf, true);
+  
+  // Start compute
+  maybe_start_compute();
+  
+  // Try to overlap: schedule next broadcast via task (creates yield point)
+  // This allows compute to start before next broadcast setup
+  if (bcast_step + 1 < P) {
+    @activate(start_next_bcast_task_id);
+  }
+}
+
+fn maybe_start_compute() void {
+  if (!computing) {
+    computing = true;
+    @activate(compute_task_id);
+  }
+}
+
+// Track if next broadcast is pending (waiting for buffer)
+var next_bcast_pending: bool = false;
+
+// Task to start next broadcast (called via @activate for yield point)
+task start_next_bcast() void {
+  if (bcast_step + 1 >= P) {
+    return;  // No more steps to broadcast
+  }
+  
+  const next_buf: u16 = 1 - bcast_buf;
+  
+  // Check if next_buf is free (not being computed)
+  // compute_step % 2 tells us which buffer compute is using
+  const compute_uses_next_buf = computing and (compute_step % 2 == next_buf);
+  
+  if (!compute_uses_next_buf) {
+    // Safe to start next broadcast
+    bcast_step += 1;
+    bcast_buf = next_buf;
+    A_bcast_done = false;
+    B_bcast_done = false;
+    next_bcast_pending = false;
+    
+    do_A_broadcast();
+    if (A_bcast_done) {
+      @activate(start_B_task_id);
+    }
+  } else {
+    // Compute is using the buffer we need - mark pending
+    next_bcast_pending = true;
+  }
+}
+
+// ============================================================
+// GEMM computation: C += A_buffer * B_buffer
+// ============================================================
+
+task compute() void {
+  const buf = compute_step % 2;
+  const A_ptr = get_A_buffer(buf);
+  const B_ptr = get_B_buffer(buf);
+  
+  for (@range(u16, Nt)) |n| {
+    const b_col_offset = n * Kt;
+    const c_col_offset = n * Mt;
+
+    for (@range(u16, Kt)) |k| {
+      const b_val = B_ptr[b_col_offset + k];
+      const a_col_offset = k * Mt;
+
+      var c_dsd = @get_dsd(mem1d_dsd, .{
+        .base_address = @ptrcast([*]f32, &C_tile[c_col_offset]),
+        .extent = Mt,
+      });
+      var a_dsd = @get_dsd(mem1d_dsd, .{
+        .base_address = @ptrcast([*]f32, &A_ptr[a_col_offset]),
+        .extent = Mt,
+      });
+
+      @fmacs(c_dsd, c_dsd, a_dsd, b_val);
+    }
+  }
+
+  // Compute done for this step
+  @activate(compute_done_task_id);
+}
+
+task compute_done() void {
+  const buf = compute_step % 2;
+  
+  // Mark buffer as free
+  set_data_ready(buf, false);
+  computing = false;
+  compute_step += 1;
+  
+  if (compute_step >= P) {
+    // All computation done!
+    @activate(EXIT);
+  } else {
+    // Check if data is ready for next compute (broadcast may have completed during compute)
+    if (get_data_ready(compute_step % 2)) {
+      maybe_start_compute();
+    }
+    
+    // If broadcast was waiting for this buffer, start it now
+    if (next_bcast_pending) {
+      @activate(start_next_bcast_task_id);
+    }
+  }
+}
+
+// ============================================================
+// Main task: start the pipeline
+// ============================================================
+
+task main_task() void {
+  // Start first A broadcast
+  do_A_broadcast();
+  
+  // If source PE (for single PE case)
+  if (A_bcast_done) {
+    @activate(start_B_task_id);
+  }
+}
+
+fn main() void {
+  px = get_px();
+  py = get_py();
+  
+  // Initialize pipeline state
+  bcast_step = 0;
+  bcast_buf = 0;
+  compute_step = 0;
+  computing = false;
+  A_bcast_done = false;
+  B_bcast_done = false;
+  data_ready_0 = false;
+  data_ready_1 = false;
+  next_bcast_pending = false;
+
+  // Initialize C to zero
+  for (@range(u16, C_size)) |i| {
+    C_tile[i] = 0.0;
+  }
+
+  @activate(main_task_id);
+}
+
+task f_exit() void {
+  sys_mod.unblock_cmd_stream();
+}
+
+comptime {
+  @bind_local_task(main_task, main_task_id);
+  @bind_local_task(recv_A_done, recv_A_done_task_id);
+  @bind_local_task(recv_B_done, recv_B_done_task_id);
+  @bind_local_task(start_B, start_B_task_id);
+  @bind_local_task(compute, compute_task_id);
+  @bind_local_task(compute_done, compute_done_task_id);
+  @bind_local_task(start_next_bcast, start_next_bcast_task_id);
+  @bind_local_task(f_exit, EXIT);
+
+  if (@is_arch("wse3")) {
+    @initialize_queue(east_oq, .{ .color = east_color });
+    @initialize_queue(west_oq, .{ .color = west_color });
+    @initialize_queue(south_oq, .{ .color = south_color });
+    @initialize_queue(north_oq, .{ .color = north_color });
+    @initialize_queue(east_iq, .{ .color = east_color });
+    @initialize_queue(west_iq, .{ .color = west_color });
+    @initialize_queue(south_iq, .{ .color = south_color });
+    @initialize_queue(north_iq, .{ .color = north_color });
+  }
+
+  @export_symbol(ptr_A, "A");
+  @export_symbol(ptr_B, "B");
+  @export_symbol(ptr_C, "C");
+  @export_symbol(main);
+}

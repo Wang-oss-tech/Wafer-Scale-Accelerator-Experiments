@@ -1,0 +1,52 @@
+// SUMMA Matrix Multiplication with 4-Color Overlapped Broadcasts
+//
+// Uses two pairs of colors (even/odd) so that broadcast reception on one
+// color pair overlaps with GEMM computation reading from the other pair's buffer.
+
+param P: u16;
+param Mt: u16;
+param Kt: u16;
+param Nt: u16;
+
+// Two color pairs: even (steps 0, 2, ...) and odd (steps 1, 3, ...)
+const a_even_color: color = @get_color(0);
+const a_odd_color:  color = @get_color(1);
+const b_even_color: color = @get_color(2);
+const b_odd_color:  color = @get_color(3);
+
+// Task IDs
+const EXIT_TASK_ID:     local_task_id = @get_local_task_id(10);
+const COMPUTE_DONE_ID:  local_task_id = @get_local_task_id(11);
+
+const memcpy = @import_module("<memcpy/get_params>", .{
+  .width = P,
+  .height = P
+});
+
+layout {
+  @set_rectangle(P, P);
+
+  for (@range(u16, P)) |px| {
+    const memcpy_params = memcpy.get_params(px);
+    for (@range(u16, P)) |py| {
+      @set_tile_code(px, py, "pe.csl", .{
+        .memcpy_params = memcpy_params,
+        .P = P,
+        .Mt = Mt,
+        .Kt = Kt,
+        .Nt = Nt,
+        .a_even_color = a_even_color,
+        .a_odd_color = a_odd_color,
+        .b_even_color = b_even_color,
+        .b_odd_color = b_odd_color,
+        .EXIT_TASK_ID = EXIT_TASK_ID,
+        .COMPUTE_DONE_ID = COMPUTE_DONE_ID,
+      });
+    }
+  }
+
+  @export_name("A", [*]f32, true);
+  @export_name("B", [*]f32, true);
+  @export_name("C", [*]f32, true);
+  @export_name("main", fn()void);
+}

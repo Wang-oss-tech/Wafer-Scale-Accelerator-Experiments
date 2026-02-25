@@ -1,0 +1,90 @@
+param memcpy_params: comptime_struct;
+param pe_id: u16;
+param Nx: u16;
+param Pw: u16;
+param algo: u16;
+param is_allred: u16;
+param step: u16;
+
+const sys_mod = @import_module("<memcpy/memcpy>", memcpy_params);
+const exit_task_id: local_task_id = @get_local_task_id(18);
+const bcast_right_id: local_task_id = @get_local_task_id(19);
+const finish_sync_id: local_task_id = @get_local_task_id(20);
+const timestamp = @import_module("modules/time.csl");
+
+const chain_reduce_left = @import_module("modules/reduce.csl", .{.color_1 = @get_color(10), .color_2 = @get_color(11), .pe_id = pe_id, .POS_DIR = EAST, .NEG_DIR = WEST, .NUM_PES = Pw, .step = 8, .algo = 0, .timestamp = timestamp});
+
+const two_way_bcast = @import_module("modules/two_way_broadcast.csl", .{.color_1 = @get_color(12), .color_2 = @get_color(13), .pe_id = pe_id, .POS_DIR = EAST, .NEG_DIR = WEST, .NUM_PES = Pw, .timestamp = timestamp});
+
+
+// tsc_size_words = 3
+// starting time of H2D/D2H
+var tscStartBuffer = @zeros([timestamp.tsc_size_words]u16);
+// ending time of H2D/D2H
+var tscEndBuffer = @zeros([timestamp.tsc_size_words]u16);
+var tscRefBuffer = @zeros([timestamp.tsc_size_words]u16);
+
+var time_buf_u16 = @zeros([timestamp.tsc_size_words*2]u16);
+var time_ref_u16 = @zeros([timestamp.tsc_size_words]u16);
+
+var ptr_time_buf_u16: [*]u16 = &time_buf_u16;
+var ptr_time_ref: [*]u16 = &time_ref_u16;
+
+var x = @constants([Nx]f32, @as(f32, 1.0));
+var x_ptr: [*]f32 = &x;
+
+var dummy = @zeros([4096]f32);
+const dummy_mem_dsd = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{4096} -> dummy[i]});
+
+fn f_sync(n: i16) void {
+  timestamp.enable_tsc();
+  // Perform chain reduce to synchronize all PEs
+  @fadds(dummy_mem_dsd, dummy_mem_dsd, 1.0);
+  chain_reduce_left.transfer_data(&dummy, 4096, bcast_right_id, &tscStartBuffer);
+}
+
+task bcast_right() void {
+  two_way_bcast.transfer_data(x_ptr, Nx, exit_task_id, &tscStartBuffer, &tscEndBuffer);
+}
+
+task finish_sync() void {
+  timestamp.get_timestamp(&tscRefBuffer);
+}
+
+task exit_task() void {
+    sys_mod.unblock_cmd_stream();
+}
+
+fn f_memcpy_timestamps() void {
+
+  time_buf_u16[0] = tscStartBuffer[0];
+  time_buf_u16[1] = tscStartBuffer[1];
+  time_buf_u16[2] = tscStartBuffer[2];
+
+  time_buf_u16[3] = tscEndBuffer[0];
+  time_buf_u16[4] = tscEndBuffer[1];
+  time_buf_u16[5] = tscEndBuffer[2];
+
+  time_ref_u16[0] = tscRefBuffer[0];
+  time_ref_u16[1] = tscRefBuffer[1];
+  time_ref_u16[2] = tscRefBuffer[2];
+
+  sys_mod.unblock_cmd_stream();
+}
+
+comptime {
+  @bind_local_task(exit_task, exit_task_id);
+  @bind_local_task(bcast_right, bcast_right_id);
+  @bind_local_task(finish_sync, finish_sync_id);
+
+  chain_reduce_left.configure_network();
+  two_way_bcast.configure_network();
+  @rpc(@get_data_task_id(sys_mod.LAUNCH));
+
+  @export_symbol(x_ptr, "x");
+  @export_symbol(ptr_time_buf_u16, "time_buf_u16");
+  @export_symbol(ptr_time_ref, "time_ref");
+
+  @export_symbol(f_sync);
+  @export_symbol(f_memcpy_timestamps);
+}

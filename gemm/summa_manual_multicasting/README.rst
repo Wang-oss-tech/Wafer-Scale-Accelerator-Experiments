@@ -1,0 +1,1 @@
+trying to build a sequential version of summa with manual broadcast and multicasting across the 1D

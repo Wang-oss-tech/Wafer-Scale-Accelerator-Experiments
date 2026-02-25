@@ -1,0 +1,31 @@
+param Pw: u16;
+param Ph: u16;
+param step: u16;
+param Nx_start: u16;
+param Algo: u16;
+param is_allred: u16;
+
+const LAUNCH: color = @get_color(8); // Color used by memcpy for kernel launch
+
+const memcpy = @import_module("<memcpy/get_params>", .{
+  .width = Pw,
+  .height = Ph,
+  .LAUNCH = LAUNCH
+});
+
+layout {
+  @set_rectangle(Pw, Ph);
+  for (@range(u16, Pw)) |Px| {
+    for (@range(u16, Ph)) |Py| {
+      @set_tile_code(Px, Py, "code_2d_test.csl", .{.Pw = Pw, .Ph=Ph, .Nx_start = Nx_start, .algo = Algo, .memcpy_params = memcpy.get_params(Px), .is_allred = is_allred, .step = step});
+    }
+  }
+
+  @export_name("x", [*]f32, true);
+  @export_name("time_buf_u16", [*]u16, true);
+  @export_name("time_ref", [*]u16, true);
+
+  @export_name("compute", fn()void);
+  @export_name("f_memcpy_timestamps", fn()void);
+  @export_name("f_sync", fn(i16)void);
+}

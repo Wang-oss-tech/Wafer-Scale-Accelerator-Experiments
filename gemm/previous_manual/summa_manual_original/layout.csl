@@ -1,0 +1,103 @@
+// 2D SUMMA without collectives_2d library
+// Uses async receives with callbacks (like broadcast_1d)
+//
+// At step i:
+//   - Column i broadcasts A tiles horizontally (east/west)
+//   - Row i broadcasts B tiles vertically (north/south)
+//   - All PEs compute: C += A_buffer * B_buffer
+
+param P: u16;   // Grid dimension (P x P PEs)
+param Mt: u16;  // Rows of A tile / rows of C tile
+param Kt: u16;  // Cols of A tile / rows of B tile
+param Nt: u16;  // Cols of B tile / cols of C tile
+
+// Colors for horizontal broadcast (A tiles)
+const east_color: color = @get_color(0);  // A flows left→right
+const west_color: color = @get_color(1);  // A flows right→left
+
+// Colors for vertical broadcast (B tiles)
+const south_color: color = @get_color(2); // B flows top→bottom
+const north_color: color = @get_color(3); // B flows bottom→top
+
+const memcpy = @import_module("<memcpy/get_params>", .{
+  .width = P,
+  .height = P,
+});
+
+layout {
+  @set_rectangle(P, P);
+
+  for (@range(u16, P)) |py| {
+    for (@range(u16, P)) |px| {
+      const memcpy_params = memcpy.get_params(px);
+
+      @set_tile_code(px, py, "pe.csl", .{
+        .memcpy_params = memcpy_params,
+        .P = P,
+        .Mt = Mt,
+        .Kt = Kt,
+        .Nt = Nt,
+        .east_color = east_color,
+        .west_color = west_color,
+        .south_color = south_color,
+        .north_color = north_color,
+      });
+
+      // === Horizontal routes (east/west) for A broadcast ===
+      // All PEs can inject (RAMP) or receive from neighbor
+      // All PEs deliver to RAMP - source PE must set up receive to consume
+
+      if (px == P - 1) {
+        // Rightmost: no east neighbor
+        @set_color_config(px, py, east_color, .{
+          .routes = .{ .rx = .{WEST, RAMP}, .tx = .{RAMP} }
+        });
+      } else {
+        @set_color_config(px, py, east_color, .{
+          .routes = .{ .rx = .{WEST, RAMP}, .tx = .{RAMP, EAST} }
+        });
+      }
+
+      if (px == 0) {
+        // Leftmost: no west neighbor
+        @set_color_config(px, py, west_color, .{
+          .routes = .{ .rx = .{EAST, RAMP}, .tx = .{RAMP} }
+        });
+      } else {
+        @set_color_config(px, py, west_color, .{
+          .routes = .{ .rx = .{EAST, RAMP}, .tx = .{RAMP, WEST} }
+        });
+      }
+
+      // === Vertical routes (north/south) for B broadcast ===
+
+      if (py == P - 1) {
+        // Bottom: no south neighbor
+        @set_color_config(px, py, south_color, .{
+          .routes = .{ .rx = .{NORTH, RAMP}, .tx = .{RAMP} }
+        });
+      } else {
+        @set_color_config(px, py, south_color, .{
+          .routes = .{ .rx = .{NORTH, RAMP}, .tx = .{RAMP, SOUTH} }
+        });
+      }
+
+      if (py == 0) {
+        // Top: no north neighbor
+        @set_color_config(px, py, north_color, .{
+          .routes = .{ .rx = .{SOUTH, RAMP}, .tx = .{RAMP} }
+        });
+      } else {
+        @set_color_config(px, py, north_color, .{
+          .routes = .{ .rx = .{SOUTH, RAMP}, .tx = .{RAMP, NORTH} }
+        });
+      }
+    }
+  }
+
+  // Export symbols for host access
+  @export_name("A", [*]f32, true);
+  @export_name("B", [*]f32, true);
+  @export_name("C", [*]f32, false);
+  @export_name("main", fn()void);
+}

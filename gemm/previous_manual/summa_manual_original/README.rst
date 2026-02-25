@@ -1,0 +1,1 @@
+manual implementation of summa without collectives_2d library/ sequential version

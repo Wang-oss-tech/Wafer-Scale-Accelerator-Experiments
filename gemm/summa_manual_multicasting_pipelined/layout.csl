@@ -1,0 +1,57 @@
+// SUMMA Matrix Multiplication with Pipelined Broadcasts
+//
+// This implementation overlaps communication with computation:
+// - Broadcast(k+1) runs in parallel with GEMM(k)
+// - Uses double buffers to avoid data conflicts
+
+// Program rectangle is P x P
+param P: u16;
+
+// Matrix tile dimensions on each PE
+param Mt: u16;
+param Kt: u16;
+param Nt: u16;
+
+// Colors for A (horizontal) and B (vertical) broadcasts
+const a_color: color = @get_color(0);
+const b_color: color = @get_color(1);
+
+// Task IDs
+const EXIT_TASK_ID: local_task_id = @get_local_task_id(10);
+const A_BCAST_DONE_ID: local_task_id = @get_local_task_id(11);
+const B_BCAST_DONE_ID: local_task_id = @get_local_task_id(12);
+const COMPUTE_DONE_ID: local_task_id = @get_local_task_id(13);
+
+const memcpy = @import_module("<memcpy/get_params>", .{
+  .width = P,
+  .height = P
+});
+
+layout {
+  @set_rectangle(P, P);
+
+  for (@range(u16, P)) |px| {
+    const memcpy_params = memcpy.get_params(px);
+    for (@range(u16, P)) |py| {
+      @set_tile_code(px, py, "pe.csl", .{
+        .memcpy_params = memcpy_params,
+        .P = P,
+        .Mt = Mt,
+        .Kt = Kt,
+        .Nt = Nt,
+        .a_color = a_color,
+        .b_color = b_color,
+        .EXIT_TASK_ID = EXIT_TASK_ID,
+        .A_BCAST_DONE_ID = A_BCAST_DONE_ID,
+        .B_BCAST_DONE_ID = B_BCAST_DONE_ID,
+        .COMPUTE_DONE_ID = COMPUTE_DONE_ID,
+      });
+    }
+  }
+
+  // Export symbols for host access
+  @export_name("A", [*]f32, true);
+  @export_name("B", [*]f32, true);
+  @export_name("C", [*]f32, true);
+  @export_name("main", fn()void);
+}

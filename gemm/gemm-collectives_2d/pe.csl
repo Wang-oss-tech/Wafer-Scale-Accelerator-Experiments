@@ -1,0 +1,263 @@
+// Copyright 2025 Cerebras Systems.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// This program implements the SUMMA matrix multiplication algorithm and is
+// written as an example to show how to use the `collectives_2d` library.
+
+// We perform GEMM in `P` many steps on a grid of `P x P` processors.
+// At each step `i`, PEs in the `i`th column broadcast their home tiles of `A`
+// to other PEs in their row, and PEs in the `i`th row broadcast their home
+// tiles of `B` to other PEs in their column. Once both broadcasts are complete
+// as determined by `x_done()` and `y_done()` both being activated,
+// each PE computes `C_tile += Ap * Bp` where `Ap` and `Bp` are pointers to
+// either the PE's home tile or the tile it received through broadcasts.
+
+param c2d_params: comptime_struct;
+param memcpy_params: comptime_struct;
+
+// Matrix size params
+param Mt: i16;
+param Kt: i16;
+param Nt: i16;
+
+// Task IDs
+const EXIT:            local_task_id = @get_local_task_id(12);
+const compute_task_id: local_task_id = @get_local_task_id(13);
+const x_task_id:       local_task_id = @get_local_task_id(14);
+const y_task_id:       local_task_id = @get_local_task_id(15);
+
+const mpi_x = @import_module("<collectives_2d/pe>", .{
+    .dim_params = c2d_params.x,
+    .queues = [2]u16{2,4},
+    .dest_dsr_ids = [1]u16{1},
+    .src0_dsr_ids = [1]u16{1},
+    .src1_dsr_ids = [1]u16{1}
+    });
+const mpi_y = @import_module("<collectives_2d/pe>", .{
+    .dim_params = c2d_params.y,
+    .queues = [2]u16{3,5},
+    .dest_dsr_ids = [1]u16{2},
+    .src0_dsr_ids = [1]u16{2},
+    .src1_dsr_ids = [1]u16{2}
+    });
+
+// On WSE-2, memcpy uses input/output queue 0
+// On WSE-3, memcpy uses input/output queues 0 and 1
+const sys_mod = @import_module("<memcpy/memcpy>", memcpy_params);
+
+// Import simprint for debugging
+const prt = @import_module("<simprint>");
+
+// Import timestamp for cycle-count instrumentation
+const timestamp = @import_module("<time>");
+
+const P = @get_rectangle().width;
+
+// This PE's home tile of A, B, C
+// `A_tile` and `B_tile` will be populated with initial values by run.py
+// These arrays are stored in a column major format.
+var A_tile = @zeros([Mt*Kt]f32);
+var B_tile = @zeros([Kt*Nt]f32);
+var C_tile = @zeros([Mt*Nt]f32);
+
+var ptr_A : [*]f32 = &A_tile;
+var ptr_B : [*]f32 = &B_tile;
+var ptr_C : [*]f32 = &C_tile;
+
+// Temporary buffers for storing in-flight tiles of A and B
+var A_buffer = @zeros([Mt*Kt]f32);
+var B_buffer = @zeros([Kt*Nt]f32);
+
+var px: u16;
+var py: u16;
+
+// Timestamp buffers for performance (48-bit cycle count = 3 u16 words)
+var tscStartBuffer = @zeros([timestamp.tsc_size_words]u16);
+var tscEndBuffer   = @zeros([timestamp.tsc_size_words]u16);
+var tscRefBuffer   = @zeros([timestamp.tsc_size_words]u16);
+var time_buf_f32   = @zeros([3]f32);
+var ptr_time_memcpy: [*]f32 = &time_buf_f32;
+var time_ref_f32   = @zeros([2]f32);
+var ptr_time_ref:   [*]f32 = &time_ref_f32;
+
+task x_done() void {
+  prt.print_string("X broadcast ");
+  prt.print_u16_decimal(step);
+  prt.print_string(" completed at location ");
+  prt.print_u16_decimal(px);
+  prt.print_string(",");
+  prt.print_u16_decimal(py);
+  prt.print_string("\n");
+  
+  @activate(compute_task_id);
+}
+
+task y_done() void {
+  prt.print_string("Y broadcast ");
+  prt.print_u16_decimal(step);
+  prt.print_string(" completed at location ");
+  prt.print_u16_decimal(px);
+  prt.print_string(",");
+  prt.print_u16_decimal(py);
+  prt.print_string("\n");
+  
+  @unblock(compute_task_id);
+}
+
+var step: u16 = 0;
+fn main() void {
+  @assert(step < P);
+
+  // The first time through we need to initialize our state
+  if (step == 0) {
+    mpi_x.init();
+    mpi_y.init();
+    px = mpi_x.pe_id;
+    py = mpi_y.pe_id;
+
+    // Record timestamps before kernel starts
+    timestamp.enable_tsc();
+    timestamp.get_timestamp(&tscRefBuffer);
+    timestamp.get_timestamp(&tscStartBuffer);
+    
+    prt.print_string("Main entry at location ");
+    prt.print_u16_decimal(px);
+    prt.print_string(",");
+    prt.print_u16_decimal(py);
+    prt.print_string("\n");
+  }
+
+  prt.print_string("Starting broadcast ");
+  prt.print_u16_decimal(step);
+  prt.print_string(" at location ");
+  prt.print_u16_decimal(px);
+  prt.print_string(",");
+  prt.print_u16_decimal(py);
+  prt.print_string("\n");
+
+  // Communicate along both rows and columns
+  const Ap = if (px == step) &A_tile else &A_buffer;
+  const Bp = if (py == step) &B_tile else &B_buffer;
+  mpi_x.broadcast(step, @ptrcast([*]u32, Ap), Mt * Kt, x_task_id);
+  mpi_y.broadcast(step, @ptrcast([*]u32, Bp), Kt * Nt, y_task_id);
+}
+
+task compute() void {
+  prt.print_string("Starting GEMM ");
+  prt.print_u16_decimal(step);
+  prt.print_string(" location ");
+  prt.print_u16_decimal(px);
+  prt.print_string(",");
+  prt.print_u16_decimal(py);
+  prt.print_string("\n");
+  
+  const Ap = if (px == step) &A_tile else &A_buffer;
+  const Bp = if (py == step) &B_tile else &B_buffer;
+
+  // Do an fmacs based local GEMM
+  var A_dsd  = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt} -> A_tile[i] });
+  A_dsd = @set_dsd_base_addr(A_dsd, Ap);
+
+  for (@range(i16, Kt)) |k| { 
+    var C_dsd = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt} -> C_tile[i] });
+
+    for (@range(i16, Nt)) |j| {
+      const b = Bp.*[j*Kt + k];
+      @fmacs(C_dsd, C_dsd, A_dsd, b);
+      C_dsd = @increment_dsd_offset(C_dsd, Mt, f32);
+    }
+    A_dsd = @increment_dsd_offset(A_dsd, Mt, f32);
+  }
+
+  prt.print_string("Ending GEMM ");
+  prt.print_u16_decimal(step);
+  prt.print_string(" location ");
+  prt.print_u16_decimal(px);
+  prt.print_string(",");
+  prt.print_u16_decimal(py);
+  prt.print_string("\n");
+
+  step += 1;
+  @block(compute_task_id);
+
+  if (step != P) {
+    main();
+  } else {
+    @activate(EXIT);
+  }
+}
+
+// Pack tscStartBuffer and tscEndBuffer (6 u16 words total) into 3 f32 bit patterns.
+// Layout: f32[0] = {start[1], start[0]}, f32[1] = {end[0], start[2]}, f32[2] = {end[2], end[1]}
+fn f_memcpy_timestamps() void {
+  var lo_: u16 = 0;
+  var hi_: u16 = 0;
+
+  lo_ = tscStartBuffer[0];
+  hi_ = tscStartBuffer[1];
+  time_buf_f32[0] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+
+  lo_ = tscStartBuffer[2];
+  hi_ = tscEndBuffer[0];
+  time_buf_f32[1] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+
+  lo_ = tscEndBuffer[1];
+  hi_ = tscEndBuffer[2];
+  time_buf_f32[2] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+}
+
+// Pack tscRefBuffer (3 u16 words) into 2 f32 bit patterns.
+// Layout: f32[0] = {ref[1], ref[0]}, f32[1] = {0, ref[2]}
+fn f_reference_timestamps() void {
+  var lo_: u16 = 0;
+  var hi_: u16 = 0;
+
+  lo_ = tscRefBuffer[0];
+  hi_ = tscRefBuffer[1];
+  time_ref_f32[0] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+
+  lo_ = tscRefBuffer[2];
+  hi_ = 0;
+  time_ref_f32[1] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+}
+
+task f_exit() void {
+  timestamp.get_timestamp(&tscEndBuffer);
+  timestamp.disable_tsc();
+  f_reference_timestamps();
+  f_memcpy_timestamps();
+
+  prt.print_string("All SUMMA steps completed at location ");
+  prt.print_u16_decimal(px);
+  prt.print_string(",");
+  prt.print_u16_decimal(py);
+  prt.print_string("\n");
+
+  // the user must unblock cmd color for every PE
+  sys_mod.unblock_cmd_stream();
+}
+
+comptime {
+  @bind_local_task(f_exit, EXIT);
+  @bind_local_task(compute, compute_task_id);
+  @bind_local_task(x_done, x_task_id);
+  @bind_local_task(y_done, y_task_id);
+  @block(compute_task_id);
+  @export_symbol(ptr_C, "C");
+  @export_symbol(ptr_A, "A");
+  @export_symbol(ptr_B, "B");
+  @export_symbol(ptr_time_memcpy, "time_memcpy");
+  @export_symbol(ptr_time_ref, "time_ref");
+  @export_symbol(main);
+}

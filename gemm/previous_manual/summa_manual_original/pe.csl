@@ -1,0 +1,397 @@
+// 2D SUMMA PE Program - Async Receive Version
+// At step i:
+//   - Column i broadcasts A tiles horizontally
+//   - Row i broadcasts B tiles vertically
+//   - All PEs compute: C += A_buffer * B_buffer
+//
+// Uses async receives with callbacks (like broadcast_1d)
+
+param memcpy_params: comptime_struct;
+param P: u16;
+param Mt: u16;
+param Kt: u16;
+param Nt: u16;
+param east_color: color;
+param west_color: color;
+param south_color: color;
+param north_color: color;
+
+const sys_mod = @import_module("<memcpy/memcpy>", memcpy_params);
+const layout_mod = @import_module("<layout>");
+
+// Tile sizes
+const A_size: u16 = Mt * Kt;
+const B_size: u16 = Kt * Nt;
+const C_size: u16 = Mt * Nt;
+
+// Task IDs 
+const main_task_id: local_task_id = @get_local_task_id(8);
+const compute_task_id: local_task_id = @get_local_task_id(9);
+const recv_A_done_task_id: local_task_id = @get_local_task_id(10);
+const recv_B_done_task_id: local_task_id = @get_local_task_id(11);
+const start_B_task_id: local_task_id = @get_local_task_id(13);  // Start B after A done
+const EXIT: local_task_id = @get_local_task_id(12);
+
+// Queues
+const east_oq: output_queue = @get_output_queue(2);
+const west_oq: output_queue = @get_output_queue(3);
+const south_oq: output_queue = @get_output_queue(4);
+const north_oq: output_queue = @get_output_queue(5);
+const east_iq: input_queue = @get_input_queue(2);
+const west_iq: input_queue = @get_input_queue(3);
+const south_iq: input_queue = @get_input_queue(4);
+const north_iq: input_queue = @get_input_queue(5);
+
+// ============================================================
+// Data storage
+// ============================================================
+
+// Home tiles (initialized by host)
+var A_tile: [A_size]f32;
+var B_tile: [B_size]f32;
+var C_tile: [C_size]f32;
+
+// Buffers for received broadcasts
+var A_buffer: [A_size]f32;
+var B_buffer: [B_size]f32;
+
+// Pointers for export
+var ptr_A: [*]f32 = &A_tile;
+var ptr_B: [*]f32 = &B_tile;
+const ptr_C: [*]f32 = &C_tile;
+
+// ============================================================
+// State tracking
+// ============================================================
+
+var step: u16 = 0;
+var px: u16 = 0;
+var py: u16 = 0;
+var A_done: bool = false;
+var B_done: bool = false;
+
+fn get_px() u16 {
+  return @as(u16, layout_mod.get_x_coord());
+}
+
+fn get_py() u16 {
+  return @as(u16, layout_mod.get_y_coord());
+}
+
+// ============================================================
+// Synchronization - Serialized: A broadcast, then B broadcast
+// ============================================================
+
+fn check_A_done() void {
+  if (A_done) {
+    // A is done, now start B broadcast
+    @activate(start_B_task_id);
+  }
+}
+
+fn check_B_done() void {
+  if (B_done) {
+    // Both A and B are done, compute
+    @activate(compute_task_id);
+  }
+}
+
+task recv_A_done() void {
+  A_done = true;
+  check_A_done();
+}
+
+task recv_B_done() void {
+  B_done = true;
+  check_B_done();
+}
+
+// Task to start B broadcast after A is complete
+task start_B() void {
+  do_B_broadcast();
+  // If source PE (already has B data), check immediately
+  check_B_done();
+}
+
+// ============================================================
+// A broadcast - horizontal (column broadcasts to row)
+// ============================================================
+
+fn setup_recv_A_from_west() void {
+  const in_dsd = @get_dsd(fabin_dsd, .{
+    .fabric_color = east_color,
+    .extent = A_size,
+    .input_queue = east_iq,
+  });
+  const out_dsd = @get_dsd(mem1d_dsd, .{
+    .base_address = &A_buffer,
+    .extent = A_size,
+  });
+  @mov32(out_dsd, in_dsd, .{ .async = true, .activate = recv_A_done_task_id });
+}
+
+fn setup_recv_A_from_east() void {
+  const in_dsd = @get_dsd(fabin_dsd, .{
+    .fabric_color = west_color,
+    .extent = A_size,
+    .input_queue = west_iq,
+  });
+  const out_dsd = @get_dsd(mem1d_dsd, .{
+    .base_address = &A_buffer,
+    .extent = A_size,
+  });
+  @mov32(out_dsd, in_dsd, .{ .async = true, .activate = recv_A_done_task_id });
+}
+
+fn send_A_east() void {
+  const in_dsd = @get_dsd(mem1d_dsd, .{
+    .base_address = &A_tile,
+    .extent = A_size,
+  });
+  const out_dsd = @get_dsd(fabout_dsd, .{
+    .fabric_color = east_color,
+    .extent = A_size,
+    .output_queue = east_oq,
+  });
+  @mov32(out_dsd, in_dsd);  // blocking
+}
+
+fn send_A_west() void {
+  const in_dsd = @get_dsd(mem1d_dsd, .{
+    .base_address = &A_tile,
+    .extent = A_size,
+  });
+  const out_dsd = @get_dsd(fabout_dsd, .{
+    .fabric_color = west_color,
+    .extent = A_size,
+    .output_queue = west_oq,
+  });
+  @mov32(out_dsd, in_dsd);  // blocking
+}
+
+fn do_A_broadcast() void {
+  if (px == step) {
+    // Source column - set up receive to consume self-broadcast, then send
+    // The broadcast goes to RAMP (self) and neighbors via hardware forwarding
+    if (px < P - 1) {
+      // Can send east - set up receive on east_color to consume self-delivery
+      setup_recv_A_from_west();
+      send_A_east();
+    }
+    if (px > 0) {
+      // Can send west - set up receive on west_color to consume self-delivery
+      setup_recv_A_from_east();
+      send_A_west();
+    }
+
+    // Handle edge cases where source doesn't send in a direction
+    if (P == 1) {
+      // Single PE - just copy directly
+      for (@range(u16, A_size)) |i| {
+        A_buffer[i] = A_tile[i];
+      }
+      A_done = true;
+    } else if (px == 0) {
+      // Leftmost: only sent east, one receive will complete
+    } else if (px == P - 1) {
+      // Rightmost: only sent west, one receive will complete
+    }
+    // Middle: sent both directions, first receive to complete will set A_done
+
+  } else if (px < step) {
+    // Left of source - receive from east via west_color
+    setup_recv_A_from_east();
+  } else {
+    // Right of source - receive from west via east_color
+    setup_recv_A_from_west();
+  }
+}
+
+// ============================================================
+// B broadcast - vertical (row broadcasts to column)
+// ============================================================
+
+fn setup_recv_B_from_north() void {
+  const in_dsd = @get_dsd(fabin_dsd, .{
+    .fabric_color = south_color,
+    .extent = B_size,
+    .input_queue = south_iq,
+  });
+  const out_dsd = @get_dsd(mem1d_dsd, .{
+    .base_address = &B_buffer,
+    .extent = B_size,
+  });
+  @mov32(out_dsd, in_dsd, .{ .async = true, .activate = recv_B_done_task_id });
+}
+
+fn setup_recv_B_from_south() void {
+  const in_dsd = @get_dsd(fabin_dsd, .{
+    .fabric_color = north_color,
+    .extent = B_size,
+    .input_queue = north_iq,
+  });
+  const out_dsd = @get_dsd(mem1d_dsd, .{
+    .base_address = &B_buffer,
+    .extent = B_size,
+  });
+  @mov32(out_dsd, in_dsd, .{ .async = true, .activate = recv_B_done_task_id });
+}
+
+fn send_B_south() void {
+  const in_dsd = @get_dsd(mem1d_dsd, .{
+    .base_address = &B_tile,
+    .extent = B_size,
+  });
+  const out_dsd = @get_dsd(fabout_dsd, .{
+    .fabric_color = south_color,
+    .extent = B_size,
+    .output_queue = south_oq,
+  });
+  @mov32(out_dsd, in_dsd);  // blocking
+}
+
+fn send_B_north() void {
+  const in_dsd = @get_dsd(mem1d_dsd, .{
+    .base_address = &B_tile,
+    .extent = B_size,
+  });
+  const out_dsd = @get_dsd(fabout_dsd, .{
+    .fabric_color = north_color,
+    .extent = B_size,
+    .output_queue = north_oq,
+  });
+  @mov32(out_dsd, in_dsd);  // blocking
+}
+
+fn do_B_broadcast() void {
+  if (py == step) {
+    // Source row - set up receive to consume self-broadcast, then send
+    if (py < P - 1) {
+      // Can send south - set up receive on south_color to consume self-delivery
+      setup_recv_B_from_north();
+      send_B_south();
+    }
+    if (py > 0) {
+      // Can send north - set up receive on north_color to consume self-delivery
+      setup_recv_B_from_south();
+      send_B_north();
+    }
+
+    // Handle edge cases
+    if (P == 1) {
+      // Single PE - just copy directly
+      for (@range(u16, B_size)) |i| {
+        B_buffer[i] = B_tile[i];
+      }
+      B_done = true;
+    } else if (py == 0) {
+      // Top: only sent south, one receive will complete
+    } else if (py == P - 1) {
+      // Bottom: only sent north, one receive will complete
+    }
+
+  } else if (py < step) {
+    // Above source - receive from south via north_color
+    setup_recv_B_from_south();
+  } else {
+    // Below source - receive from north via south_color
+    setup_recv_B_from_north();
+  }
+}
+
+// ============================================================
+// GEMM computation: C += A_buffer * B_buffer
+// ============================================================
+
+task compute() void {
+  for (@range(u16, Nt)) |n| {
+    const b_col_offset = n * Kt;
+    const c_col_offset = n * Mt;
+
+    for (@range(u16, Kt)) |k| {
+      const b_val = B_buffer[b_col_offset + k];
+      const a_col_offset = k * Mt;
+
+      var c_dsd = @get_dsd(mem1d_dsd, .{
+        .base_address = @ptrcast([*]f32, &C_tile[c_col_offset]),
+        .extent = Mt,
+      });
+      var a_dsd = @get_dsd(mem1d_dsd, .{
+        .base_address = @ptrcast([*]f32, &A_buffer[a_col_offset]),
+        .extent = Mt,
+      });
+
+      @fmacs(c_dsd, c_dsd, a_dsd, b_val);
+    }
+  }
+
+  // Move to next step
+  step += 1;
+  A_done = false;
+  B_done = false;
+
+  if (step < P) {
+    @activate(main_task_id);
+  } else {
+    @activate(EXIT);
+  }
+}
+
+// ============================================================
+// Main task: orchestrate one SUMMA step (serialized: A then B)
+// ============================================================
+
+task main_task() void {
+  A_done = false;
+  B_done = false;
+
+  // Start A broadcast only - B will start after A completes
+  do_A_broadcast();
+
+  // If source PE for A (already has A data), check immediately
+  check_A_done();
+}
+
+fn main() void {
+  px = get_px();
+  py = get_py();
+  step = 0;
+  A_done = false;
+  B_done = false;
+
+  // Initialize C to zero
+  for (@range(u16, C_size)) |i| {
+    C_tile[i] = 0.0;
+  }
+
+  @activate(main_task_id);
+}
+
+task f_exit() void {
+  sys_mod.unblock_cmd_stream();
+}
+
+comptime {
+  @bind_local_task(main_task, main_task_id);
+  @bind_local_task(recv_A_done, recv_A_done_task_id);
+  @bind_local_task(recv_B_done, recv_B_done_task_id);
+  @bind_local_task(start_B, start_B_task_id);
+  @bind_local_task(compute, compute_task_id);
+  @bind_local_task(f_exit, EXIT);
+
+  if (@is_arch("wse3")) {
+    @initialize_queue(east_oq, .{ .color = east_color });
+    @initialize_queue(west_oq, .{ .color = west_color });
+    @initialize_queue(south_oq, .{ .color = south_color });
+    @initialize_queue(north_oq, .{ .color = north_color });
+    @initialize_queue(east_iq, .{ .color = east_color });
+    @initialize_queue(west_iq, .{ .color = west_color });
+    @initialize_queue(south_iq, .{ .color = south_color });
+    @initialize_queue(north_iq, .{ .color = north_color });
+  }
+
+  @export_symbol(ptr_A, "A");
+  @export_symbol(ptr_B, "B");
+  @export_symbol(ptr_C, "C");
+  @export_symbol(main);
+}

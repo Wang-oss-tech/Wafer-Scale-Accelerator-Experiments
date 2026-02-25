@@ -1,0 +1,389 @@
+// SUMMA PE Program with 4-Color Overlapped Broadcasts
+//
+// Uses two pairs of colors (even/odd) so that broadcast(k) on one color pair
+// can run via the async/microcode engine while the CE executes GEMM(k-1)
+// reading from the other color pair's buffer.  No data tasks needed.
+//
+// Flow:
+//   broadcast(0) on even colors [wait for callbacks]
+//   for k = 1..P-1:
+//     configure + start broadcast(k) on color pair for step k  (async)
+//     do_gemm(k-1) on previous step's buffer                   (CE)
+//   do_gemm(P-1)
+//   done
+
+param memcpy_params: comptime_struct;
+param P: u16;
+param Mt: i16;
+param Kt: i16;
+param Nt: i16;
+
+param a_even_color: color;
+param a_odd_color: color;
+param b_even_color: color;
+param b_odd_color: color;
+
+param EXIT_TASK_ID: local_task_id;
+param COMPUTE_DONE_ID: local_task_id;
+
+const sys_mod = @import_module("<memcpy/memcpy>", memcpy_params);
+const layout_mod = @import_module("<layout>");
+const prt = @import_module("<simprint>");
+
+// ============================================================================
+// Color Config Register Access
+// ============================================================================
+const tile_config = @import_module("<tile_config>");
+const word_size = tile_config.target.word_size;
+const addresses = tile_config.target.addresses;
+
+fn get_color_config_addr(c: color) u16 {
+    return @as(u16, addresses.COLOR_CONFIG) + @get_int(c) * word_size;
+}
+
+const MASK_CLEAR_IO: u16 = 0xfc00;
+const INPUT_RAMP:  u16 = 0x200;
+const INPUT_NORTH: u16 = 0x100;
+const INPUT_SOUTH: u16 = 0x080;
+const INPUT_EAST:  u16 = 0x040;
+const INPUT_WEST:  u16 = 0x020;
+const OUTPUT_RAMP:  u16 = 0x10;
+const OUTPUT_NORTH: u16 = 0x08;
+const OUTPUT_SOUTH: u16 = 0x04;
+const OUTPUT_EAST:  u16 = 0x02;
+const OUTPUT_WEST:  u16 = 0x01;
+
+// ============================================================================
+// PE State
+// ============================================================================
+
+var px: u16 = 0;
+var py: u16 = 0;
+
+// Home tiles (populated by host)
+var A_tile = @zeros([Mt * Kt]f32);
+var B_tile = @zeros([Kt * Nt]f32);
+var C_tile = @zeros([Mt * Nt]f32);
+
+// Double buffers: even steps → buf_0, odd steps → buf_1
+var A_recv_0 = @zeros([Mt * Kt]f32);
+var A_recv_1 = @zeros([Mt * Kt]f32);
+var B_recv_0 = @zeros([Kt * Nt]f32);
+var B_recv_1 = @zeros([Kt * Nt]f32);
+
+// Pointers for export
+var ptr_A: [*]f32 = &A_tile;
+var ptr_B: [*]f32 = &B_tile;
+var ptr_C: [*]f32 = &C_tile;
+
+// Color config register addresses (set in main)
+var a_even_addr: u16 = 0;
+var a_odd_addr: u16 = 0;
+var b_even_addr: u16 = 0;
+var b_odd_addr: u16 = 0;
+
+
+// ============================================================================
+// Buffer Selection
+// ============================================================================
+
+fn get_A_buffer(step: u16) *[Mt * Kt]f32 {
+    return if (step % 2 == 0) &A_recv_0 else &A_recv_1;
+}
+
+fn get_B_buffer(step: u16) *[Kt * Nt]f32 {
+    return if (step % 2 == 0) &B_recv_0 else &B_recv_1;
+}
+
+// ============================================================================
+// Fabric DSDs — one set per color
+// ============================================================================
+
+// Even color pair (queues 2, 4)
+var fab_a_even_out = @get_dsd(fabout_dsd, .{ .extent = Mt * Kt, .fabric_color = a_even_color, .output_queue = @get_output_queue(2) });
+var fab_a_even_in  = @get_dsd(fabin_dsd,  .{ .extent = Mt * Kt, .fabric_color = a_even_color, .input_queue = @get_input_queue(2) });
+var fab_b_even_out = @get_dsd(fabout_dsd, .{ .extent = Kt * Nt, .fabric_color = b_even_color, .output_queue = @get_output_queue(4) });
+var fab_b_even_in  = @get_dsd(fabin_dsd,  .{ .extent = Kt * Nt, .fabric_color = b_even_color, .input_queue = @get_input_queue(4) });
+
+// Odd color pair (queues 3, 5)
+var fab_a_odd_out = @get_dsd(fabout_dsd, .{ .extent = Mt * Kt, .fabric_color = a_odd_color, .output_queue = @get_output_queue(3) });
+var fab_a_odd_in  = @get_dsd(fabin_dsd,  .{ .extent = Mt * Kt, .fabric_color = a_odd_color, .input_queue = @get_input_queue(3) });
+var fab_b_odd_out = @get_dsd(fabout_dsd, .{ .extent = Kt * Nt, .fabric_color = b_odd_color, .output_queue = @get_output_queue(5) });
+var fab_b_odd_in  = @get_dsd(fabin_dsd,  .{ .extent = Kt * Nt, .fabric_color = b_odd_color, .input_queue = @get_input_queue(5) });
+
+// Memory DSDs (base addr set before each use)
+var mem_A_tile = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt * Kt} -> A_tile[i] });
+var mem_B_tile = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Kt * Nt} -> B_tile[i] });
+var mem_A_recv = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt * Kt} -> A_recv_0[i] });
+var mem_B_recv = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Kt * Nt} -> B_recv_0[i] });
+
+// ============================================================================
+// Routing Configuration
+// ============================================================================
+
+fn configure_row_broadcast(k: u16, color_addr: u16) void {
+    var r_state: u16 = @bitcast(*u16, color_addr).*;
+    r_state = r_state & MASK_CLEAR_IO;
+
+    if (px == k) {
+        if (k == 0) {
+            r_state = r_state | INPUT_RAMP | OUTPUT_EAST;
+        } else if (k == P - 1) {
+            r_state = r_state | INPUT_RAMP | OUTPUT_WEST;
+        } else {
+            r_state = r_state | INPUT_RAMP | OUTPUT_EAST | OUTPUT_WEST;
+        }
+    } else if (px < k) {
+        if (px == 0) {
+            r_state = r_state | INPUT_EAST | OUTPUT_RAMP;
+        } else {
+            r_state = r_state | INPUT_EAST | OUTPUT_RAMP | OUTPUT_WEST;
+        }
+    } else {
+        if (px == P - 1) {
+            r_state = r_state | INPUT_WEST | OUTPUT_RAMP;
+        } else {
+            r_state = r_state | INPUT_WEST | OUTPUT_RAMP | OUTPUT_EAST;
+        }
+    }
+
+    @bitcast(*u16, color_addr).* = r_state;
+}
+
+fn configure_col_broadcast(k: u16, color_addr: u16) void {
+    var r_state: u16 = @bitcast(*u16, color_addr).*;
+    r_state = r_state & MASK_CLEAR_IO;
+
+    if (py == k) {
+        if (k == 0) {
+            r_state = r_state | INPUT_RAMP | OUTPUT_SOUTH;
+        } else if (k == P - 1) {
+            r_state = r_state | INPUT_RAMP | OUTPUT_NORTH;
+        } else {
+            r_state = r_state | INPUT_RAMP | OUTPUT_SOUTH | OUTPUT_NORTH;
+        }
+    } else if (py < k) {
+        if (py == 0) {
+            r_state = r_state | INPUT_SOUTH | OUTPUT_RAMP;
+        } else {
+            r_state = r_state | INPUT_SOUTH | OUTPUT_RAMP | OUTPUT_NORTH;
+        }
+    } else {
+        if (py == P - 1) {
+            r_state = r_state | INPUT_NORTH | OUTPUT_RAMP;
+        } else {
+            r_state = r_state | INPUT_NORTH | OUTPUT_RAMP | OUTPUT_SOUTH;
+        }
+    }
+
+    @bitcast(*u16, color_addr).* = r_state;
+}
+
+// ============================================================================
+// Broadcast 0 — even colors, with callbacks
+// ============================================================================
+
+fn start_broadcast_0() void {
+    prt.print_string("Starting broadcast 0 at location ");
+    prt.print_u16_decimal(px);
+    prt.print_string(",");
+    prt.print_u16_decimal(py);
+    prt.print_string("\n");
+    configure_row_broadcast(0, a_even_addr);
+    configure_col_broadcast(0, b_even_addr);
+    prt.print_string("Configured broadcast 0 at location ");
+    prt.print_u16_decimal(px);
+    prt.print_string(",");
+    prt.print_u16_decimal(py);
+    prt.print_string("\n");
+
+
+    mem_A_recv = @set_dsd_base_addr(mem_A_recv, get_A_buffer(0));
+    mem_B_recv = @set_dsd_base_addr(mem_B_recv, get_B_buffer(0));
+
+    if (px == 0) {
+        @fmovs(fab_a_even_out, mem_A_tile, .{ .async = true }); // sending to fabric
+    } else {
+        @fmovs(mem_A_recv, fab_a_even_in, .{ .async = true }); // receiving from fabric
+    }
+
+    if (py == 0) {
+        @fmovs(fab_b_even_out, mem_B_tile, .{ .async = true, .activate = COMPUTE_DONE_ID }); // sending to fabric
+    } else {
+        @fmovs(mem_B_recv, fab_b_even_in, .{ .async = true, .activate = COMPUTE_DONE_ID }); // receiving from fabric
+    }
+}
+
+// ============================================================================
+// Broadcast k (k >= 1) — alternates even/odd colors, no callbacks
+// ============================================================================
+
+fn start_broadcast_async(k: u16) void {
+    prt.print_string("Starting broadcast ");
+    prt.print_u16_decimal(k);
+    prt.print_string(" at location ");
+    prt.print_u16_decimal(px);
+    prt.print_string(",");
+    prt.print_u16_decimal(py);
+    prt.print_string("\n");
+    if (k % 2 == 0) {
+        configure_row_broadcast(k, a_even_addr);
+        configure_col_broadcast(k, b_even_addr);
+    } else {
+        configure_row_broadcast(k, a_odd_addr);
+        configure_col_broadcast(k, b_odd_addr);
+    }
+    prt.print_string("Configured broadcast ");
+    prt.print_u16_decimal(k);
+    prt.print_string(" at location ");
+    prt.print_u16_decimal(px);
+    prt.print_string(",");
+    prt.print_u16_decimal(py);
+    prt.print_string("\n");
+    mem_A_recv = @set_dsd_base_addr(mem_A_recv, get_A_buffer(k));
+    mem_B_recv = @set_dsd_base_addr(mem_B_recv, get_B_buffer(k));
+
+    if (k % 2 == 0) {
+        // Even step — use even color pair
+        if (px == k) {
+            @fmovs(fab_a_even_out, mem_A_tile, .{ .async = true });
+        } else {
+            @fmovs(mem_A_recv, fab_a_even_in, .{ .async = true });
+        }
+        if (py == k) {
+            @fmovs(fab_b_even_out, mem_B_tile, .{ .async = true });
+        } else {
+            @fmovs(mem_B_recv, fab_b_even_in, .{ .async = true });
+        }
+    } else {
+        // Odd step — use odd color pair
+        if (px == k) {
+            @fmovs(fab_a_odd_out, mem_A_tile, .{ .async = true });
+        } else {
+            @fmovs(mem_A_recv, fab_a_odd_in, .{ .async = true });
+        }
+        if (py == k) {
+            @fmovs(fab_b_odd_out, mem_B_tile, .{ .async = true });
+        } else {
+            @fmovs(mem_B_recv, fab_b_odd_in, .{ .async = true });
+        }
+    }
+}
+
+// ============================================================================
+// GEMM
+// ============================================================================
+
+fn do_gemm(k: u16) void {
+    prt.print_string("Starting GEMM ");
+    prt.print_u16_decimal(k);
+    prt.print_string(" location ");
+    prt.print_u16_decimal(px);
+    prt.print_string(",");
+    prt.print_u16_decimal(py);
+    prt.print_string("\n");
+    const Ap = if (px == k) &A_tile else get_A_buffer(k);
+    const Bp = if (py == k) &B_tile else get_B_buffer(k);
+
+    var A_dsd = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt} -> A_tile[i] });
+    A_dsd = @set_dsd_base_addr(A_dsd, Ap);
+
+    for (@range(i16, Kt)) |kk| {
+        var C_dsd = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt} -> C_tile[i] });
+
+        for (@range(i16, Nt)) |j| {
+            const b = Bp.*[@as(u16, j) * @as(u16, Kt) + @as(u16, kk)];
+
+            // if (px == 0 and py == 0) {
+            //     prt.print_string("Starting FMAC ");
+            //     prt.print_string("\n");
+            // }
+
+            @fmacs(C_dsd, C_dsd, A_dsd, b);
+
+            // if (px == 0 and py == 0) {
+            //     prt.print_string("Ending FMAC ");
+            //     prt.print_string("\n");
+            // }
+
+            C_dsd = @increment_dsd_offset(C_dsd, Mt, f32);
+        }
+        A_dsd = @increment_dsd_offset(A_dsd, Mt, f32);
+    }
+    prt.print_string("Ending GEMM ");
+    prt.print_u16_decimal(k);
+    prt.print_string(" location ");
+    prt.print_u16_decimal(px);
+    prt.print_string(",");
+    prt.print_u16_decimal(py);
+    prt.print_string("\n");
+}
+// ============================================================================
+// First broadcast callbacks → kick off the pipeline
+// ============================================================================
+
+
+
+// ============================================================================
+// Pipeline — runs after broadcast 0 completes
+// ============================================================================
+
+task run_pipeline() void {
+    prt.print_string("Broadcast 0 completed, Starting pipeline at location ");
+    prt.print_u16_decimal(px);
+    prt.print_string(",");
+    prt.print_u16_decimal(py);
+    prt.print_string("\n");
+    var k: u16 = 1;
+    while (k < P) : (k += 1) {
+        // Start broadcast k on the alternate color pair (async)
+        start_broadcast_async(k);
+        // GEMM on previous step's data — CE runs while async engine
+        // receives step k's data into the other buffer
+        do_gemm(k - 1);
+    }
+
+    // Last GEMM — no more broadcasts needed
+    do_gemm(P - 1);
+
+    sys_mod.unblock_cmd_stream();
+}
+
+// ============================================================================
+// Main Entry Point
+// ============================================================================
+
+fn main() void {
+    px = @as(u16, layout_mod.get_x_coord());
+    py = @as(u16, layout_mod.get_y_coord());
+
+    a_even_addr = get_color_config_addr(a_even_color);
+    a_odd_addr  = get_color_config_addr(a_odd_color);
+    b_even_addr = get_color_config_addr(b_even_color);
+    b_odd_addr  = get_color_config_addr(b_odd_color);
+
+    start_broadcast_0();
+}
+
+task exit_task() void {
+    sys_mod.unblock_cmd_stream();
+}
+
+// ============================================================================
+// Comptime Setup
+// ============================================================================
+
+comptime {
+    @block(a_even_color);
+    @block(a_odd_color);
+    @block(b_even_color);
+    @block(b_odd_color);
+
+    @bind_local_task(run_pipeline, COMPUTE_DONE_ID);
+    @bind_local_task(exit_task, EXIT_TASK_ID);
+
+    @export_symbol(ptr_A, "A");
+    @export_symbol(ptr_B, "B");
+    @export_symbol(ptr_C, "C");
+    @export_symbol(main);
+}

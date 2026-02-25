@@ -1,0 +1,19 @@
+  What bandwidth-test COULD give you:
+
+  # Run for different configurations to get empirical data
+  cd bandwidth-test
+  ./commands_wse2.sh
+
+  # Then run with various parameters:
+  cs_python run.py -m=4 -n=4 -k=196 --loop_count=1          # H2D
+  cs_python run.py -m=4 -n=4 -k=196 --loop_count=1 --d2h    # D2H
+  cs_python run.py -m=8 -n=8 -k=196 --loop_count=1          # larger grid
+  cs_python run.py -m=4 -n=4 -k=392 --loop_count=1          # more data per PE
+
+  This would give you actual cycles_send for each configuration, from which you could fit:
+
+  cycles = α × wavelets + β × (w + h) + γ
+
+  with proper coefficients.
+
+  Would you like me to help design a sweep to collect this data and fit a proper model?

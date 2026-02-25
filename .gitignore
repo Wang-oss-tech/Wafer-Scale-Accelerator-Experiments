@@ -1,0 +1,15 @@
+# Huge simulation trace directories
+simfab_traces/
+
+# Logs
+*.log
+
+# Large trace files without extensions
+stream0
+
+# Build / output artifacts
+out/
+*.elf
+
+# Temporary workflow directories
+wio_flows_tmpdir*/

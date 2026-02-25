@@ -1,0 +1,63 @@
+{
+  "rpc_symbols": [
+    {
+      "id": 1,
+      "immutable": 0,
+      "kind": "Var",
+      "name": "A",
+      "sym_name": "ptr_A",
+      "type": "[*]f32"
+    },
+    {
+      "id": 7,
+      "kind": "Func",
+      "name": "f_sync",
+      "sym_name": "f_sync",
+      "type": "void"
+    },
+    {
+      "id": 4,
+      "kind": "Func",
+      "name": "f_tic",
+      "sym_name": "f_tic",
+      "type": "void"
+    },
+    {
+      "id": 6,
+      "kind": "Func",
+      "name": "f_memcpy_timestamps",
+      "sym_name": "f_memcpy_timestamps",
+      "type": "void"
+    },
+    {
+      "id": 2,
+      "immutable": 0,
+      "kind": "Var",
+      "name": "time_memcpy",
+      "sym_name": "ptr_time_memcpy",
+      "type": "[*]f32"
+    },
+    {
+      "id": 8,
+      "kind": "Func",
+      "name": "f_reference_timestamps",
+      "sym_name": "f_reference_timestamps",
+      "type": "void"
+    },
+    {
+      "id": 3,
+      "immutable": 0,
+      "kind": "Var",
+      "name": "time_ref",
+      "sym_name": "ptr_time_ref",
+      "type": "[*]f32"
+    },
+    {
+      "id": 5,
+      "kind": "Func",
+      "name": "f_toc",
+      "sym_name": "f_toc",
+      "type": "void"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+#!/home/william_wang_yale/R_2.6.0/csl-examples/experiments/cs_appliance_sdk/bin/python3.11
+
+import os
+import subprocess
+import sys
+
+import cerebras.appliance
+
+if __name__ == "__main__":
+    start_path = cerebras.appliance.__path__[0]
+    raw_cmd = [os.path.join(start_path, "bin/raw/csctl")]
+    raw_cmd.extend(sys.argv[1:])
+    subprocess.run(raw_cmd, stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr)

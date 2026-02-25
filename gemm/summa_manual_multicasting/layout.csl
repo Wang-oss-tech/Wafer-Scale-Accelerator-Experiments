@@ -1,0 +1,59 @@
+// SUMMA Matrix Multiplication with Manual Multicasting
+//
+// This implementation uses runtime routing configuration to perform
+// row and column broadcasts with multicasting for the SUMMA algorithm.
+
+// Program rectangle is P x P
+param P: u16;
+
+// Matrix tile dimensions on each PE
+// A_tile: Mt x Kt, B_tile: Kt x Nt, C_tile: Mt x Nt
+param Mt: u16;
+param Kt: u16;
+param Nt: u16;
+
+// Colors for A (horizontal) and B (vertical) broadcasts
+const a_color: color = @get_color(0);
+const b_color: color = @get_color(1);
+
+// Task IDs
+const EXIT_TASK_ID: local_task_id = @get_local_task_id(10);
+const A_DONE_TASK_ID: local_task_id = @get_local_task_id(11);
+const B_DONE_TASK_ID: local_task_id = @get_local_task_id(12);
+const COMPUTE_TASK_ID: local_task_id = @get_local_task_id(13);
+
+const memcpy = @import_module("<memcpy/get_params>", .{
+  .width = P,
+  .height = P
+});
+
+layout {
+  @set_rectangle(P, P);
+
+  for (@range(u16, P)) |px| {
+    const memcpy_params = memcpy.get_params(px);
+    for (@range(u16, P)) |py| {
+      @set_tile_code(px, py, "pe.csl", .{
+        .memcpy_params = memcpy_params,
+        .P = P,
+        .Mt = Mt,
+        .Kt = Kt,
+        .Nt = Nt,
+        .a_color = a_color,
+        .b_color = b_color,
+        .EXIT_TASK_ID = EXIT_TASK_ID,
+        .A_DONE_TASK_ID = A_DONE_TASK_ID,
+        .B_DONE_TASK_ID = B_DONE_TASK_ID,
+        .COMPUTE_TASK_ID = COMPUTE_TASK_ID,
+      });
+    }
+  }
+
+  // Export symbols for host access
+  @export_name("A", [*]f32, true);
+  @export_name("B", [*]f32, true);
+  @export_name("C", [*]f32, true);
+  @export_name("time_memcpy", [*]f32, true);
+  @export_name("time_ref", [*]f32, true);
+  @export_name("main", fn()void);
+}
