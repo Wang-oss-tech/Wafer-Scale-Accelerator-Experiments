@@ -1,16 +1,5 @@
-// Copyright 2025 Cerebras Systems.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SUMMA GEMM using collectives_2d — fp16 variant
+// Adapted from gemm-collectives_2d (f32) for fair comparison with MeshGEMM.
 
 // Color/ task ID map
 //
@@ -25,10 +14,7 @@
 //   7                  16                  25                    34
 //   8 c2d_x_entrypt_0  17                  26                    35
 
-// Program rectangle is P x P
 param P: u16;
-
-// Matrix dimensions on one PE
 param Mt: u16;
 param Kt: u16;
 param Nt: u16;
@@ -49,25 +35,29 @@ layout {
     const memcpy_params = memcpy.get_params(Px);
     while (Py < P) : (Py += 1) {
       const c2d_params = c2d.get_params(Px, Py, .{
-        .x_colors      = .{ @get_color(0),         @get_color(1) },
-        .x_entrypoints = .{ @get_local_task_id(8), @get_local_task_id(9) },
-        .y_colors      = .{ @get_color(4),         @get_color(5) },
+        .x_colors      = .{ @get_color(0),          @get_color(1) },
+        .x_entrypoints = .{ @get_local_task_id(8),  @get_local_task_id(9) },
+        .y_colors      = .{ @get_color(4),           @get_color(5) },
         .y_entrypoints = .{ @get_local_task_id(10), @get_local_task_id(11) },
       });
       @set_tile_code(Px, Py, "pe.csl", .{
         .memcpy_params = memcpy_params,
-        .c2d_params = c2d_params,
+        .c2d_params    = c2d_params,
         .Mt = Mt, .Kt = Kt, .Nt = Nt,
       });
     }
   }
 
-  // export symbol names
-  @export_name("A", [*]f32, true);
-  @export_name("B", [*]f32, true);
-  @export_name("C", [*]f32, true);
+  // f16 data symbols
+  @export_name("A", [*]f16, true);
+  @export_name("B", [*]f16, true);
+  @export_name("C", [*]f16, true);
+
+  // Timestamp symbols (still f32 — packed bit patterns)
   @export_name("time_memcpy", [*]f32, true);
-  @export_name("time_ref", [*]f32, true);
-  @export_name("main", fn()void);
+  @export_name("time_ref",    [*]f32, true);
+
+  @export_name("main",       fn()void);
+  @export_name("reset",      fn()void);
   @export_name("summa_host", fn(i16, i16)void);
 }

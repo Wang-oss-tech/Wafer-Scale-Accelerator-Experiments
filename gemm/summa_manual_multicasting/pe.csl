@@ -32,32 +32,10 @@ const prt = @import_module("<simprint>");
 const timestamp = @import_module("<time>");
 
 // ============================================================================
-// Color Config Register Access (from wse2_color_config.csl)
+// Color Config Register Access
 // ============================================================================
 const tile_config = @import_module("<tile_config>");
-const word_size = tile_config.target.word_size;
-const addresses = tile_config.target.addresses;
-
-fn get_color_config_addr(c: color) u16 {
-    return @as(u16, addresses.COLOR_CONFIG) + @get_int(c) * word_size;
-}
-
-// Mask to clear input/output bits (bits 9:0), preserve control bits (15:10)
-const MASK_CLEAR_IO: u16 = 0xfc00;
-
-// Input bits (pick ONE) - bits 9:5
-const INPUT_RAMP:  u16 = 0x200;  // bit 9
-const INPUT_NORTH: u16 = 0x100;  // bit 8
-const INPUT_SOUTH: u16 = 0x080;  // bit 7
-const INPUT_EAST:  u16 = 0x040;  // bit 6
-const INPUT_WEST:  u16 = 0x020;  // bit 5
-
-// Output bits (can combine) - bits 4:0
-const OUTPUT_RAMP:  u16 = 0x10;  // bit 4
-const OUTPUT_NORTH: u16 = 0x08;  // bit 3
-const OUTPUT_SOUTH: u16 = 0x04;  // bit 2
-const OUTPUT_EAST:  u16 = 0x02;  // bit 1
-const OUTPUT_WEST:  u16 = 0x01;  // bit 0
+const color_config = tile_config.color_config;
 
 // ============================================================================
 // PE State
@@ -84,15 +62,17 @@ var ptr_A: [*]f32 = &A_tile;
 var ptr_B: [*]f32 = &B_tile;
 var ptr_C: [*]f32 = &C_tile;
 
-// Color config register addresses
-var a_color_addr: u16 = 0;
-var b_color_addr: u16 = 0;
+// Queue IDs (named for @initialize_queue / @block on WSE-3)
+const a_oq: output_queue = @get_output_queue(2);
+const a_iq: input_queue  = @get_input_queue(2);
+const b_oq: output_queue = @get_output_queue(3);
+const b_iq: input_queue  = @get_input_queue(3);
 
-// Fabric DSDs for communication
-var fab_a_out = @get_dsd(fabout_dsd, .{ .extent = Mt * Kt, .fabric_color = a_color, .output_queue = @get_output_queue(2) });
-var fab_a_in  = @get_dsd(fabin_dsd,  .{ .extent = Mt * Kt, .fabric_color = a_color, .input_queue = @get_input_queue(2) });
-var fab_b_out = @get_dsd(fabout_dsd, .{ .extent = Kt * Nt, .fabric_color = b_color, .output_queue = @get_output_queue(3) });
-var fab_b_in  = @get_dsd(fabin_dsd,  .{ .extent = Kt * Nt, .fabric_color = b_color, .input_queue = @get_input_queue(3) });
+// Fabric DSDs for communication (const so they can be loaded into DSRs at comptime)
+const fab_a_out = @get_dsd(fabout_dsd, .{ .extent = Mt * Kt, .fabric_color = a_color, .output_queue = a_oq });
+const fab_a_in  = @get_dsd(fabin_dsd,  .{ .extent = Mt * Kt, .fabric_color = a_color, .input_queue  = a_iq });
+const fab_b_out = @get_dsd(fabout_dsd, .{ .extent = Kt * Nt, .fabric_color = b_color, .output_queue = b_oq });
+const fab_b_in  = @get_dsd(fabin_dsd,  .{ .extent = Kt * Nt, .fabric_color = b_color, .input_queue  = b_iq });
 
 // Memory DSDs
 var mem_A_tile = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt * Kt} -> A_tile[i] });
@@ -119,94 +99,100 @@ var ptr_time_ref: [*]f32 = &time_ref_f32;
 
 // Configure a_color for row broadcast with root at column k
 fn configure_row_broadcast(k: u16) void {
-    // prt.print_string("Configuring row broadcast");
-    // prt.print_u16_decimal(px);
-    // prt.print_u16_decimal(py);
-    // prt.print_string("\n");
-
-    var r_state: u16 = @bitcast(*u16, a_color_addr).*;
-    r_state = r_state & MASK_CLEAR_IO;
+    prt.print_string("Configuring row broadcast");
+    prt.print_u16_decimal(px);
+    prt.print_u16_decimal(py);
+    prt.print_string("\n");
 
     if (px == k) {
         // I am the ROOT - send from RAMP
         if (k == 0) {
             // Leftmost column: send EAST only
-            r_state = r_state | INPUT_RAMP | OUTPUT_EAST;
+            color_config.reset_routes(a_color, .{ .rx = RAMP, .tx = EAST });
         } else if (k == P - 1) {
             // Rightmost column: send WEST only
-            r_state = r_state | INPUT_RAMP | OUTPUT_WEST;
+            color_config.reset_routes(a_color, .{ .rx = RAMP, .tx = WEST });
         } else {
             // Middle: send both directions
-            r_state = r_state | INPUT_RAMP | OUTPUT_EAST | OUTPUT_WEST;
+            color_config.reset_routes(a_color, .{ .rx = RAMP, .tx = [2]direction{EAST, WEST} });
         }
     } else if (px < k) {
         // I am LEFT of root - receive from EAST
         if (px == 0) {
             // Leftmost: consume only
-            r_state = r_state | INPUT_EAST | OUTPUT_RAMP;
+            color_config.reset_routes(a_color, .{ .rx = EAST, .tx = RAMP });
         } else {
             // Forward WEST + consume
-            r_state = r_state | INPUT_EAST | OUTPUT_RAMP | OUTPUT_WEST;
+            color_config.reset_routes(a_color, .{ .rx = EAST, .tx = [2]direction{RAMP, WEST} });
         }
     } else {
         // I am RIGHT of root - receive from WEST
         if (px == P - 1) {
             // Rightmost: consume only
-            r_state = r_state | INPUT_WEST | OUTPUT_RAMP;
+            color_config.reset_routes(a_color, .{ .rx = WEST, .tx = RAMP });
         } else {
             // Forward EAST + consume
-            r_state = r_state | INPUT_WEST | OUTPUT_RAMP | OUTPUT_EAST;
+            color_config.reset_routes(a_color, .{ .rx = WEST, .tx = [2]direction{RAMP, EAST} });
         }
     }
 
-    @block(a_color);
-    @bitcast(*u16, a_color_addr).* = r_state;
-    // prt.print_string("Finished row broadcast");
-    // prt.print_u16_decimal(px);
-    // // prt.print_string(",");
-    // prt.print_u16_decimal(py);
-    // prt.print_string("\n");
+    if (@is_arch("wse2")) {
+        @block(a_color);
+    }
+    prt.print_string("Finished row broadcast");
+    prt.print_u16_decimal(px);
+    prt.print_string(",");
+    prt.print_u16_decimal(py);
+    prt.print_string("\n");
 }
 
 // Configure b_color for column broadcast with root at row k
 fn configure_col_broadcast(k: u16) void {
-    var r_state: u16 = @bitcast(*u16, b_color_addr).*;
-    r_state = r_state & MASK_CLEAR_IO;
+    prt.print_string("Configuring col broadcast");
+    prt.print_u16_decimal(px);
+    prt.print_u16_decimal(py);
+    prt.print_string("\n");
 
     if (py == k) {
         // I am the ROOT - send from RAMP
         if (k == 0) {
             // Top row: send SOUTH only
-            r_state = r_state | INPUT_RAMP | OUTPUT_SOUTH;
+            color_config.reset_routes(b_color, .{ .rx = RAMP, .tx = SOUTH });
         } else if (k == P - 1) {
             // Bottom row: send NORTH only
-            r_state = r_state | INPUT_RAMP | OUTPUT_NORTH;
+            color_config.reset_routes(b_color, .{ .rx = RAMP, .tx = NORTH });
         } else {
             // Middle: send both directions
-            r_state = r_state | INPUT_RAMP | OUTPUT_SOUTH | OUTPUT_NORTH;
+            color_config.reset_routes(b_color, .{ .rx = RAMP, .tx = [2]direction{SOUTH, NORTH} });
         }
     } else if (py < k) {
         // I am ABOVE root - receive from SOUTH
         if (py == 0) {
             // Top row: consume only
-            r_state = r_state | INPUT_SOUTH | OUTPUT_RAMP;
+            color_config.reset_routes(b_color, .{ .rx = SOUTH, .tx = RAMP });
         } else {
             // Forward NORTH + consume
-            r_state = r_state | INPUT_SOUTH | OUTPUT_RAMP | OUTPUT_NORTH;
+            color_config.reset_routes(b_color, .{ .rx = SOUTH, .tx = [2]direction{RAMP, NORTH} });
         }
     } else {
         // I am BELOW root - receive from NORTH
         if (py == P - 1) {
             // Bottom row: consume only
-            r_state = r_state | INPUT_NORTH | OUTPUT_RAMP;
+            color_config.reset_routes(b_color, .{ .rx = NORTH, .tx = RAMP });
         } else {
             // Forward SOUTH + consume
-            r_state = r_state | INPUT_NORTH | OUTPUT_RAMP | OUTPUT_SOUTH;
+            color_config.reset_routes(b_color, .{ .rx = NORTH, .tx = [2]direction{RAMP, SOUTH} });
         }
     }
 
-    @block(b_color);
-    @bitcast(*u16, b_color_addr).* = r_state;
+    if (@is_arch("wse2")) {
+        @block(b_color);
+    }
+    prt.print_string("Finished col broadcast");
+    prt.print_u16_decimal(px);
+    prt.print_string(",");
+    prt.print_u16_decimal(py);
+    prt.print_string("\n");
 }
 
 // ============================================================================
@@ -228,15 +214,14 @@ task b_done_task() void {
 }
 
 fn do_broadcast_A() void {
-    // prt.print_string("Starting A broadcast ");
-    // prt.print_u16_decimal(step);
-    // prt.print_string(" at location ");
-    // prt.print_u16_decimal(px);
-    // prt.print_string(",");
-    // prt.print_u16_decimal(py);
-    // prt.print_string("\n");
-    
-    // Colors stay blocked - fabin requires blocked color to read from queue
+    prt.print_string("Starting A broadcast ");
+    prt.print_u16_decimal(step);
+    prt.print_string(" at location ");
+    prt.print_u16_decimal(px);
+    prt.print_string(",");
+    prt.print_u16_decimal(py);
+    prt.print_string("\n");
+
     if (px == step) {
         // I am root: send my A_tile
         @fmovs(fab_a_out, mem_A_tile, .{ .async = true, .activate = A_DONE_TASK_ID });
@@ -247,15 +232,14 @@ fn do_broadcast_A() void {
 }
 
 fn do_broadcast_B() void {
-    // prt.print_string("Starting B broadcast ");
-    // prt.print_u16_decimal(step);
-    // prt.print_string(" at location ");
-    // prt.print_u16_decimal(px);
-    // prt.print_string(",");
-    // prt.print_u16_decimal(py);
-    // prt.print_string("\n");
-    
-    // Colors stay blocked - fabin requires blocked color to read from queue
+    prt.print_string("Starting B broadcast ");
+    prt.print_u16_decimal(step);
+    prt.print_string(" at location ");
+    prt.print_u16_decimal(px);
+    prt.print_string(",");
+    prt.print_u16_decimal(py);
+    prt.print_string("\n");
+
     if (py == step) {
         // I am root: send my B_tile
         @fmovs(fab_b_out, mem_B_tile, .{ .async = true, .activate = B_DONE_TASK_ID });
@@ -270,13 +254,13 @@ fn do_broadcast_B() void {
 // ============================================================================
 
 task compute_task() void {
-    // prt.print_string("Starting GEMM ");
-    // prt.print_u16_decimal(step);
-    // prt.print_string(" location ");
-    // prt.print_u16_decimal(px);
-    // prt.print_string(",");
-    // prt.print_u16_decimal(py);
-    // prt.print_string("\n");
+    prt.print_string("Starting GEMM ");
+    prt.print_u16_decimal(step);
+    prt.print_string(" location ");
+    prt.print_u16_decimal(px);
+    prt.print_string(",");
+    prt.print_u16_decimal(py);
+    prt.print_string("\n");
     
     // Get pointers to A and B data for this step
     const Ap: [*]f32 = if (px == step) &A_tile else &A_recv;
@@ -297,13 +281,13 @@ task compute_task() void {
         A_dsd = @increment_dsd_offset(A_dsd, Mt, f32);
     }
 
-    // prt.print_string("Ending GEMM ");
-    // prt.print_u16_decimal(step);
-    // prt.print_string(" location ");
-    // prt.print_u16_decimal(px);
-    // prt.print_string(",");
-    // prt.print_u16_decimal(py);
-    // prt.print_string("\n");
+    prt.print_string("Ending GEMM ");
+    prt.print_u16_decimal(step);
+    prt.print_string(" location ");
+    prt.print_u16_decimal(px);
+    prt.print_string(",");
+    prt.print_u16_decimal(py);
+    prt.print_string("\n");
     
     // Move to next step
     step += 1;
@@ -324,13 +308,13 @@ task compute_task() void {
 // ============================================================================
 
 fn summa_step() void {
-    // prt.print_string("Starting broadcast ");
-    // prt.print_u16_decimal(step);
-    // prt.print_string(" at location ");
-    // prt.print_u16_decimal(px);
-    // prt.print_string(",");
-    // prt.print_u16_decimal(py);
-    // prt.print_string("\n");
+    prt.print_string("Starting broadcast ");
+    prt.print_u16_decimal(step);
+    prt.print_string(" at location ");
+    prt.print_u16_decimal(px);
+    prt.print_string(",");
+    prt.print_u16_decimal(py);
+    prt.print_string("\n");
     
     // Reset synchronization flags
     a_done = false;
@@ -340,13 +324,13 @@ fn summa_step() void {
     configure_row_broadcast(step);
     configure_col_broadcast(step);
     
-    // prt.print_string("Configured broadcast ");
-    // prt.print_u16_decimal(step);
-    // prt.print_string(" at location ");
-    // prt.print_u16_decimal(px);
-    // prt.print_string(",");
-    // prt.print_u16_decimal(py);
-    // prt.print_string("\n");
+    prt.print_string("Configured broadcast ");
+    prt.print_u16_decimal(step);
+    prt.print_string(" at location ");
+    prt.print_u16_decimal(px);
+    prt.print_string(",");
+    prt.print_u16_decimal(py);
+    prt.print_string("\n");
 
     // Start both broadcasts
     do_broadcast_A();
@@ -357,10 +341,6 @@ fn main() void {
     // Initialize PE coordinates
     px = @as(u16, layout_mod.get_x_coord());
     py = @as(u16, layout_mod.get_y_coord());
-
-    // Get color config register addresses
-    a_color_addr = get_color_config_addr(a_color);
-    b_color_addr = get_color_config_addr(b_color);
 
     // Initialize step counter
     step = 0;
@@ -418,10 +398,19 @@ task exit_task() void {
 // ============================================================================
 
 comptime {
-    // Block colors at comptime - they stay blocked throughout
-    // This ensures fabin reads from queue instead of triggering tasks
-    @block(a_color);
-    @block(b_color);
+    // Block colors so fabin @fmovs reads from queue instead of triggering tasks.
+    // WSE-3 also requires @initialize_queue to bind colors to queues.
+    if (@is_arch("wse2")) {
+        @block(a_color);
+        @block(b_color);
+    } else if (@is_arch("wse3")) {
+        @initialize_queue(a_oq, .{ .color = a_color });
+        @initialize_queue(a_iq, .{ .color = a_color });
+        @initialize_queue(b_oq, .{ .color = b_color });
+        @initialize_queue(b_iq, .{ .color = b_color });
+        @block(a_iq);
+        @block(b_iq);
+    }
 
     // Bind tasks
     @bind_local_task(a_done_task, A_DONE_TASK_ID);

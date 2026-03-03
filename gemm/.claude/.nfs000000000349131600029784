@@ -8,10 +8,7 @@
       "Bash(__NEW_LINE_c51144b3ae552413__ grep \"landing C1 from link\" /Users/williamwang/Desktop/research_cerebras/cerebras-remote/experiments/gemm/summa_manual_multicasting_pipelined/4_1_wavelet.log)",
       "Bash(for c in C0 C1 C2 C3)",
       "Bash(do echo \"=== $c during GEMMs \\(29735-317035\\) ===\")",
-      "Bash(done)",
-      "Bash(bash:*)",
-      "Bash(./commands_wse2.sh:*)",
-      "Bash(./commands_wse3.sh:*)"
+      "Bash(done)"
     ]
   }
 }

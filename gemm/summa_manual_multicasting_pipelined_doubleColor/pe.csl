@@ -34,13 +34,11 @@ const prt = @import_module("<simprint>");
 // Color Config Register Access
 // ============================================================================
 const tile_config = @import_module("<tile_config>");
-const word_size = tile_config.target.word_size;
-const addresses = tile_config.target.addresses;
+const color_config = tile_config.color_config;
 
-fn get_color_config_addr(c: color) u16 {
-    return @as(u16, addresses.COLOR_CONFIG) + @get_int(c) * word_size;
-}
-
+// WSE-2 raw register write helpers (preserves block bit via MASK_CLEAR_IO)
+const word_size    = tile_config.target.word_size;
+const addresses    = tile_config.target.addresses;
 const MASK_CLEAR_IO: u16 = 0xfc00;
 const INPUT_RAMP:  u16 = 0x200;
 const INPUT_NORTH: u16 = 0x100;
@@ -52,6 +50,10 @@ const OUTPUT_NORTH: u16 = 0x08;
 const OUTPUT_SOUTH: u16 = 0x04;
 const OUTPUT_EAST:  u16 = 0x02;
 const OUTPUT_WEST:  u16 = 0x01;
+
+fn raw_color_addr(c: color) u16 {
+    return @as(u16, addresses.COLOR_CONFIG) + @get_int(c) * word_size;
+}
 
 // ============================================================================
 // PE State
@@ -76,12 +78,6 @@ var ptr_A: [*]f32 = &A_tile;
 var ptr_B: [*]f32 = &B_tile;
 var ptr_C: [*]f32 = &C_tile;
 
-// Color config register addresses (set in main)
-var a_even_addr: u16 = 0;
-var a_odd_addr: u16 = 0;
-var b_even_addr: u16 = 0;
-var b_odd_addr: u16 = 0;
-
 
 // ============================================================================
 // Buffer Selection
@@ -96,20 +92,36 @@ fn get_B_buffer(step: u16) *[Kt * Nt]f32 {
 }
 
 // ============================================================================
+// Queue IDs (named so they can be referenced in @initialize_queue on WSE-3)
+// ============================================================================
+
+// Even color pair (queues 2, 4)
+const a_even_oq: output_queue = @get_output_queue(2);
+const a_even_iq: input_queue  = @get_input_queue(2);
+const b_even_oq: output_queue = @get_output_queue(4);
+const b_even_iq: input_queue  = @get_input_queue(4);
+
+// Odd color pair (queues 3, 5)
+const a_odd_oq: output_queue = @get_output_queue(3);
+const a_odd_iq: input_queue  = @get_input_queue(3);
+const b_odd_oq: output_queue = @get_output_queue(5);
+const b_odd_iq: input_queue  = @get_input_queue(5);
+
+// ============================================================================
 // Fabric DSDs — one set per color
 // ============================================================================
 
 // Even color pair (queues 2, 4)
-var fab_a_even_out = @get_dsd(fabout_dsd, .{ .extent = Mt * Kt, .fabric_color = a_even_color, .output_queue = @get_output_queue(2) });
-var fab_a_even_in  = @get_dsd(fabin_dsd,  .{ .extent = Mt * Kt, .fabric_color = a_even_color, .input_queue = @get_input_queue(2) });
-var fab_b_even_out = @get_dsd(fabout_dsd, .{ .extent = Kt * Nt, .fabric_color = b_even_color, .output_queue = @get_output_queue(4) });
-var fab_b_even_in  = @get_dsd(fabin_dsd,  .{ .extent = Kt * Nt, .fabric_color = b_even_color, .input_queue = @get_input_queue(4) });
+var fab_a_even_out = @get_dsd(fabout_dsd, .{ .extent = Mt * Kt, .fabric_color = a_even_color, .output_queue = a_even_oq });
+var fab_a_even_in  = @get_dsd(fabin_dsd,  .{ .extent = Mt * Kt, .fabric_color = a_even_color, .input_queue  = a_even_iq });
+var fab_b_even_out = @get_dsd(fabout_dsd, .{ .extent = Kt * Nt, .fabric_color = b_even_color, .output_queue = b_even_oq });
+var fab_b_even_in  = @get_dsd(fabin_dsd,  .{ .extent = Kt * Nt, .fabric_color = b_even_color, .input_queue  = b_even_iq });
 
 // Odd color pair (queues 3, 5)
-var fab_a_odd_out = @get_dsd(fabout_dsd, .{ .extent = Mt * Kt, .fabric_color = a_odd_color, .output_queue = @get_output_queue(3) });
-var fab_a_odd_in  = @get_dsd(fabin_dsd,  .{ .extent = Mt * Kt, .fabric_color = a_odd_color, .input_queue = @get_input_queue(3) });
-var fab_b_odd_out = @get_dsd(fabout_dsd, .{ .extent = Kt * Nt, .fabric_color = b_odd_color, .output_queue = @get_output_queue(5) });
-var fab_b_odd_in  = @get_dsd(fabin_dsd,  .{ .extent = Kt * Nt, .fabric_color = b_odd_color, .input_queue = @get_input_queue(5) });
+var fab_a_odd_out = @get_dsd(fabout_dsd, .{ .extent = Mt * Kt, .fabric_color = a_odd_color, .output_queue = a_odd_oq });
+var fab_a_odd_in  = @get_dsd(fabin_dsd,  .{ .extent = Mt * Kt, .fabric_color = a_odd_color, .input_queue  = a_odd_iq });
+var fab_b_odd_out = @get_dsd(fabout_dsd, .{ .extent = Kt * Nt, .fabric_color = b_odd_color, .output_queue = b_odd_oq });
+var fab_b_odd_in  = @get_dsd(fabin_dsd,  .{ .extent = Kt * Nt, .fabric_color = b_odd_color, .input_queue  = b_odd_iq });
 
 // Memory DSDs (base addr set before each use)
 var mem_A_tile = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt * Kt} -> A_tile[i] });
@@ -121,62 +133,90 @@ var mem_B_recv = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Kt * Nt} -> B_recv_
 // Routing Configuration
 // ============================================================================
 
-fn configure_row_broadcast(k: u16, color_addr: u16) void {
-    var r_state: u16 = @bitcast(*u16, color_addr).*;
-    r_state = r_state & MASK_CLEAR_IO;
-
-    if (px == k) {
-        if (k == 0) {
-            r_state = r_state | INPUT_RAMP | OUTPUT_EAST;
-        } else if (k == P - 1) {
-            r_state = r_state | INPUT_RAMP | OUTPUT_WEST;
+fn configure_row_broadcast(k: u16, c: color) void {
+    if (@is_arch("wse3")) {
+        if (px == k) {
+            if (k == 0) {
+                color_config.reset_routes(c, .{ .rx = RAMP, .tx = EAST });
+            } else if (k == P - 1) {
+                color_config.reset_routes(c, .{ .rx = RAMP, .tx = WEST });
+            } else {
+                color_config.reset_routes(c, .{ .rx = RAMP, .tx = [2]direction{EAST, WEST} });
+            }
+        } else if (px < k) {
+            if (px == 0) {
+                color_config.reset_routes(c, .{ .rx = EAST, .tx = RAMP });
+            } else {
+                color_config.reset_routes(c, .{ .rx = EAST, .tx = [2]direction{RAMP, WEST} });
+            }
         } else {
-            r_state = r_state | INPUT_RAMP | OUTPUT_EAST | OUTPUT_WEST;
-        }
-    } else if (px < k) {
-        if (px == 0) {
-            r_state = r_state | INPUT_EAST | OUTPUT_RAMP;
-        } else {
-            r_state = r_state | INPUT_EAST | OUTPUT_RAMP | OUTPUT_WEST;
+            if (px == P - 1) {
+                color_config.reset_routes(c, .{ .rx = WEST, .tx = RAMP });
+            } else {
+                color_config.reset_routes(c, .{ .rx = WEST, .tx = [2]direction{RAMP, EAST} });
+            }
         }
     } else {
-        if (px == P - 1) {
-            r_state = r_state | INPUT_WEST | OUTPUT_RAMP;
+        const addr = raw_color_addr(c);
+        var r: u16 = @bitcast(*u16, addr).* & MASK_CLEAR_IO;
+        if (px == k) {
+            if (k == 0) {
+                r = r | INPUT_RAMP | OUTPUT_EAST;
+            } else if (k == P - 1) {
+                r = r | INPUT_RAMP | OUTPUT_WEST;
+            } else {
+                r = r | INPUT_RAMP | OUTPUT_EAST | OUTPUT_WEST;
+            }
+        } else if (px < k) {
+            r = r | INPUT_EAST | (if (px == 0) OUTPUT_RAMP else OUTPUT_RAMP | OUTPUT_WEST);
         } else {
-            r_state = r_state | INPUT_WEST | OUTPUT_RAMP | OUTPUT_EAST;
+            r = r | INPUT_WEST | (if (px == P - 1) OUTPUT_RAMP else OUTPUT_RAMP | OUTPUT_EAST);
         }
+        @bitcast(*u16, addr).* = r;
     }
-
-    @bitcast(*u16, color_addr).* = r_state;
 }
 
-fn configure_col_broadcast(k: u16, color_addr: u16) void {
-    var r_state: u16 = @bitcast(*u16, color_addr).*;
-    r_state = r_state & MASK_CLEAR_IO;
-
-    if (py == k) {
-        if (k == 0) {
-            r_state = r_state | INPUT_RAMP | OUTPUT_SOUTH;
-        } else if (k == P - 1) {
-            r_state = r_state | INPUT_RAMP | OUTPUT_NORTH;
+fn configure_col_broadcast(k: u16, c: color) void {
+    if (@is_arch("wse3")) {
+        if (py == k) {
+            if (k == 0) {
+                color_config.reset_routes(c, .{ .rx = RAMP, .tx = SOUTH });
+            } else if (k == P - 1) {
+                color_config.reset_routes(c, .{ .rx = RAMP, .tx = NORTH });
+            } else {
+                color_config.reset_routes(c, .{ .rx = RAMP, .tx = [2]direction{SOUTH, NORTH} });
+            }
+        } else if (py < k) {
+            if (py == 0) {
+                color_config.reset_routes(c, .{ .rx = SOUTH, .tx = RAMP });
+            } else {
+                color_config.reset_routes(c, .{ .rx = SOUTH, .tx = [2]direction{RAMP, NORTH} });
+            }
         } else {
-            r_state = r_state | INPUT_RAMP | OUTPUT_SOUTH | OUTPUT_NORTH;
-        }
-    } else if (py < k) {
-        if (py == 0) {
-            r_state = r_state | INPUT_SOUTH | OUTPUT_RAMP;
-        } else {
-            r_state = r_state | INPUT_SOUTH | OUTPUT_RAMP | OUTPUT_NORTH;
+            if (py == P - 1) {
+                color_config.reset_routes(c, .{ .rx = NORTH, .tx = RAMP });
+            } else {
+                color_config.reset_routes(c, .{ .rx = NORTH, .tx = [2]direction{RAMP, SOUTH} });
+            }
         }
     } else {
-        if (py == P - 1) {
-            r_state = r_state | INPUT_NORTH | OUTPUT_RAMP;
+        const addr = raw_color_addr(c);
+        var r: u16 = @bitcast(*u16, addr).* & MASK_CLEAR_IO;
+        if (py == k) {
+            if (k == 0) {
+                r = r | INPUT_RAMP | OUTPUT_SOUTH;
+            } else if (k == P - 1) {
+                r = r | INPUT_RAMP | OUTPUT_NORTH;
+            } else {
+                r = r | INPUT_RAMP | OUTPUT_SOUTH | OUTPUT_NORTH;
+            }
+        } else if (py < k) {
+            r = r | INPUT_SOUTH | (if (py == 0) OUTPUT_RAMP else OUTPUT_RAMP | OUTPUT_NORTH);
         } else {
-            r_state = r_state | INPUT_NORTH | OUTPUT_RAMP | OUTPUT_SOUTH;
+            r = r | INPUT_NORTH | (if (py == P - 1) OUTPUT_RAMP else OUTPUT_RAMP | OUTPUT_SOUTH);
         }
+        @bitcast(*u16, addr).* = r;
     }
-
-    @bitcast(*u16, color_addr).* = r_state;
 }
 
 // ============================================================================
@@ -189,8 +229,8 @@ fn start_broadcast_0() void {
     prt.print_string(",");
     prt.print_u16_decimal(py);
     prt.print_string("\n");
-    configure_row_broadcast(0, a_even_addr);
-    configure_col_broadcast(0, b_even_addr);
+    configure_row_broadcast(0, a_even_color);
+    configure_col_broadcast(0, b_even_color);
     prt.print_string("Configured broadcast 0 at location ");
     prt.print_u16_decimal(px);
     prt.print_string(",");
@@ -227,11 +267,11 @@ fn start_broadcast_async(k: u16) void {
     prt.print_u16_decimal(py);
     prt.print_string("\n");
     if (k % 2 == 0) {
-        configure_row_broadcast(k, a_even_addr);
-        configure_col_broadcast(k, b_even_addr);
+        configure_row_broadcast(k, a_even_color);
+        configure_col_broadcast(k, b_even_color);
     } else {
-        configure_row_broadcast(k, a_odd_addr);
-        configure_col_broadcast(k, b_odd_addr);
+        configure_row_broadcast(k, a_odd_color);
+        configure_col_broadcast(k, b_odd_color);
     }
     prt.print_string("Configured broadcast ");
     prt.print_u16_decimal(k);
@@ -356,12 +396,6 @@ task run_pipeline() void {
 fn main() void {
     px = @as(u16, layout_mod.get_x_coord());
     py = @as(u16, layout_mod.get_y_coord());
-
-    a_even_addr = get_color_config_addr(a_even_color);
-    a_odd_addr  = get_color_config_addr(a_odd_color);
-    b_even_addr = get_color_config_addr(b_even_color);
-    b_odd_addr  = get_color_config_addr(b_odd_color);
-
     start_broadcast_0();
 }
 
@@ -374,10 +408,27 @@ task exit_task() void {
 // ============================================================================
 
 comptime {
-    @block(a_even_color);
-    @block(a_odd_color);
-    @block(b_even_color);
-    @block(b_odd_color);
+    // On WSE-2, block colors to prevent spurious WTT activation.
+    // On WSE-3, @block takes input_queue not color; also must initialize all queues.
+    if (@is_arch("wse2")) {
+        @block(a_even_color);
+        @block(a_odd_color);
+        @block(b_even_color);
+        @block(b_odd_color);
+    } else if (@is_arch("wse3")) {
+        @initialize_queue(a_even_oq, .{ .color = a_even_color });
+        @initialize_queue(a_even_iq, .{ .color = a_even_color });
+        @initialize_queue(b_even_oq, .{ .color = b_even_color });
+        @initialize_queue(b_even_iq, .{ .color = b_even_color });
+        @initialize_queue(a_odd_oq,  .{ .color = a_odd_color });
+        @initialize_queue(a_odd_iq,  .{ .color = a_odd_color });
+        @initialize_queue(b_odd_oq,  .{ .color = b_odd_color });
+        @initialize_queue(b_odd_iq,  .{ .color = b_odd_color });
+        @block(a_even_iq);
+        @block(b_even_iq);
+        @block(a_odd_iq);
+        @block(b_odd_iq);
+    }
 
     @bind_local_task(run_pipeline, COMPUTE_DONE_ID);
     @bind_local_task(exit_task, EXIT_TASK_ID);

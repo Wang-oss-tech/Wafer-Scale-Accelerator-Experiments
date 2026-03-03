@@ -1,0 +1,261 @@
+// SUMMA GEMM using collectives_2d — fp16 variant
+// Adapted from gemm-collectives_2d (f32) for fair comparison with MeshGEMM.
+//
+// Key changes vs f32 original:
+//   - All tiles (A, B, C, buffers) are f16 instead of f32
+//   - Broadcast count is (Mt*Kt+1)/2 u32 words (2 f16 fit in 1 u32)
+//   - @fmacs -> @fmach for f16 FMA
+//   - reset() exported so the host can re-run without reloading
+
+param c2d_params: comptime_struct;
+param memcpy_params: comptime_struct;
+
+param Mt: i16;
+param Kt: i16;
+param Nt: i16;
+
+// Task IDs
+const EXIT:            local_task_id = @get_local_task_id(12);
+const compute_task_id: local_task_id = @get_local_task_id(13);
+const x_task_id:       local_task_id = @get_local_task_id(14);
+const y_task_id:       local_task_id = @get_local_task_id(15);
+
+const mpi_x = @import_module("<collectives_2d/pe>", .{
+    .dim_params   = c2d_params.x,
+    .queues       = [2]u16{2, 4},
+    .dest_dsr_ids = [1]u16{1},
+    .src0_dsr_ids = [1]u16{1},
+    .src1_dsr_ids = [1]u16{1},
+});
+const mpi_y = @import_module("<collectives_2d/pe>", .{
+    .dim_params   = c2d_params.y,
+    .queues       = [2]u16{3, 5},
+    .dest_dsr_ids = [1]u16{2},
+    .src0_dsr_ids = [1]u16{2},
+    .src1_dsr_ids = [1]u16{2},
+});
+
+const sys_mod   = @import_module("<memcpy/memcpy>", memcpy_params);
+const timestamp = @import_module("<time>");
+
+const P = @get_rectangle().width;
+
+// ── Tile storage (f16) ──────────────────────────────────────────────────────
+// Even-pad so that (Mt*Kt) u16 words always map to a whole number of u32 words
+// when we ptrcast to [*]u32 for the collectives_2d broadcast.
+const _A_pad: i16 = ((Mt * Kt + 1) / 2) * 2;  // round up to even
+const _B_pad: i16 = ((Kt * Nt + 1) / 2) * 2;
+
+var A_tile:   [_A_pad]f16 = @zeros([_A_pad]f16);
+var B_tile:   [_B_pad]f16 = @zeros([_B_pad]f16);
+var C_tile:   [Mt*Nt]f16  = @zeros([Mt*Nt]f16);
+var A_buffer: [_A_pad]f16 = @zeros([_A_pad]f16);
+var B_buffer: [_B_pad]f16 = @zeros([_B_pad]f16);
+
+var ptr_A: [*]f16 = &A_tile;
+var ptr_B: [*]f16 = &B_tile;
+var ptr_C: [*]f16 = &C_tile;
+
+var px: u16;
+var py: u16;
+
+// ── Timestamps ──────────────────────────────────────────────────────────────
+var tscStartBuffer = @zeros([timestamp.tsc_size_words]u16);
+var tscEndBuffer   = @zeros([timestamp.tsc_size_words]u16);
+var tscRefBuffer   = @zeros([timestamp.tsc_size_words]u16);
+var time_buf_f32   = @zeros([3]f32);
+var ptr_time_memcpy: [*]f32 = &time_buf_f32;
+var time_ref_f32   = @zeros([2]f32);
+var ptr_time_ref:   [*]f32 = &time_ref_f32;
+
+// ── Broadcast completion tasks ───────────────────────────────────────────────
+task x_done() void {
+  @activate(compute_task_id);
+}
+
+task y_done() void {
+  @unblock(compute_task_id);
+}
+
+// ── SUMMA step counter ───────────────────────────────────────────────────────
+var step: u16 = 0;
+
+// ── Multi-run state (for summa_host entry point) ─────────────────────────────
+var total_warmup_times: i16 = 0;
+var total_repeat_times: i16 = 1;
+var run_count: i16 = 0;
+var summa_host_mode: bool = false;
+
+fn main() void {
+  @assert(step < P);
+
+  if (step == 0) {
+    mpi_x.init();
+    mpi_y.init();
+    px = mpi_x.pe_id;
+    py = mpi_y.pe_id;
+
+    timestamp.enable_tsc();
+    timestamp.get_timestamp(&tscRefBuffer);
+    timestamp.get_timestamp(&tscStartBuffer);
+  }
+
+  // Broadcast along rows (A) and columns (B)
+  // Broadcast count = number of u32 words = ceil(elements / 2) for f16
+  const Ap = if (px == step) &A_tile else &A_buffer;
+  const Bp = if (py == step) &B_tile else &B_buffer;
+  mpi_x.broadcast(step, @ptrcast([*]u32, Ap), (Mt * Kt + 1) / 2, x_task_id);
+  mpi_y.broadcast(step, @ptrcast([*]u32, Bp), (Kt * Nt + 1) / 2, y_task_id);
+}
+
+// ── Local f16 GEMM ───────────────────────────────────────────────────────────
+task compute() void {
+  const Ap = if (px == step) &A_tile else &A_buffer;
+  const Bp = if (py == step) &B_tile else &B_buffer;
+
+  // C_tile += Ap * Bp  (column-major f16, same loop structure as f32 original)
+  var A_dsd = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt} -> A_tile[i] });
+  A_dsd = @set_dsd_base_addr(A_dsd, Ap);
+
+  for (@range(i16, Kt)) |k| {
+    var C_dsd = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt} -> C_tile[i] });
+
+    for (@range(i16, Nt)) |j| {
+      const b: f16 = Bp.*[j * Kt + k];
+      @fmach(C_dsd, C_dsd, A_dsd, b);
+      C_dsd = @increment_dsd_offset(C_dsd, Mt, f16);
+    }
+    A_dsd = @increment_dsd_offset(A_dsd, Mt, f16);
+  }
+
+  step += 1;
+  @block(compute_task_id);
+
+  if (step != P) {
+    main();
+  } else {
+    @activate(EXIT);
+  }
+}
+
+// ── Timestamp packing (unchanged from f32 original) ─────────────────────────
+fn f_memcpy_timestamps() void {
+  var lo_: u16 = 0;
+  var hi_: u16 = 0;
+
+  lo_ = tscStartBuffer[0]; hi_ = tscStartBuffer[1];
+  time_buf_f32[0] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+
+  lo_ = tscStartBuffer[2]; hi_ = tscEndBuffer[0];
+  time_buf_f32[1] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+
+  lo_ = tscEndBuffer[1]; hi_ = tscEndBuffer[2];
+  time_buf_f32[2] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+}
+
+fn f_reference_timestamps() void {
+  var lo_: u16 = 0;
+  var hi_: u16 = 0;
+
+  lo_ = tscRefBuffer[0]; hi_ = tscRefBuffer[1];
+  time_ref_f32[0] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+
+  lo_ = tscRefBuffer[2]; hi_ = 0;
+  time_ref_f32[1] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+}
+
+task f_exit() void {
+  if (summa_host_mode) {
+    // Multi-run mode: hand off to summa_entry to start the next run or finish.
+    summa_entry();
+  } else {
+    // Single-run mode (main/reset interface): pack timestamps, unblock host.
+    timestamp.get_timestamp(&tscEndBuffer);
+    timestamp.disable_tsc();
+    f_reference_timestamps();
+    f_memcpy_timestamps();
+    sys_mod.unblock_cmd_stream();
+  }
+}
+
+// ── Reset — allows the host to re-run without reloading ─────────────────────
+// Zeros C_tile and resets the step counter so main() can be launched again.
+fn reset() void {
+  step = 0;
+  for (@range(i16, Mt * Nt)) |i| {
+    C_tile[i] = 0.0;
+  }
+  @block(compute_task_id);
+  sys_mod.unblock_cmd_stream();
+}
+
+// ── On-device inner run start (used by summa_host's loop) ────────────────────
+// Re-inits collectives, zeros accumulator, and kicks off step-0 broadcasts.
+fn run_start_inner() void {
+  mpi_x.init();
+  mpi_y.init();
+  for (@range(i16, Mt * Nt)) |i| { C_tile[i] = 0.0; }
+  step = 0;
+  @block(compute_task_id);
+  const Ap = if (px == step) &A_tile else &A_buffer;
+  const Bp = if (py == step) &B_tile else &B_buffer;
+  mpi_x.broadcast(step, @ptrcast([*]u32, Ap), (Mt * Kt + 1) / 2, x_task_id);
+  mpi_y.broadcast(step, @ptrcast([*]u32, Bp), (Kt * Nt + 1) / 2, y_task_id);
+}
+
+// ── summa_entry: decides whether to start another run or finish ───────────────
+fn summa_entry() void {
+  if (run_count == total_warmup_times + total_repeat_times) {
+    // All runs complete — capture end timestamp and hand control back to host.
+    timestamp.get_timestamp(&tscEndBuffer);
+    timestamp.disable_tsc();
+    f_reference_timestamps();
+    f_memcpy_timestamps();
+    sys_mod.unblock_cmd_stream();
+    return;
+  }
+  if (run_count == total_warmup_times) {
+    // Warmup complete — capture start timestamp for the timed runs.
+    timestamp.get_timestamp(&tscStartBuffer);
+  }
+  run_count += 1;
+  run_start_inner();
+}
+
+// ── summa_host: on-device warmup+repeat loop (analogous to meshgemm_host) ────
+// Device timestamps span all total_repeat_times timed runs with no host
+// round-trip between runs. Divide reported (end - start) by total_repeat_times.
+fn summa_host(total_warmup_times_: i16, total_repeat_times_: i16) void {
+  total_warmup_times = total_warmup_times_;
+  total_repeat_times = total_repeat_times_;
+  run_count = 0;
+  summa_host_mode = true;
+
+  // One-time setup: resolve PE position and enable the cycle counter.
+  mpi_x.init();
+  mpi_y.init();
+  px = mpi_x.pe_id;
+  py = mpi_y.pe_id;
+
+  timestamp.enable_tsc();
+  timestamp.get_timestamp(&tscRefBuffer);
+
+  summa_entry();
+}
+
+comptime {
+  @bind_local_task(f_exit,   EXIT);
+  @bind_local_task(compute,  compute_task_id);
+  @bind_local_task(x_done,   x_task_id);
+  @bind_local_task(y_done,   y_task_id);
+  @block(compute_task_id);
+
+  @export_symbol(ptr_A, "A");
+  @export_symbol(ptr_B, "B");
+  @export_symbol(ptr_C, "C");
+  @export_symbol(ptr_time_memcpy, "time_memcpy");
+  @export_symbol(ptr_time_ref,    "time_ref");
+  @export_symbol(main);
+  @export_symbol(reset);
+  @export_symbol(summa_host);
+}

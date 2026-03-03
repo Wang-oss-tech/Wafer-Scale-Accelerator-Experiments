@@ -1,31 +1,24 @@
 #!/usr/bin/env cs_python
 
-# Copyright 2025 Cerebras Systems.
+# Host program for SUMMA GEMM (collectives_2d) — fp16 variant.
+# Adapted from gemm-collectives_2d (f32) for fair comparison with MeshGEMM.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 # Two-pass execution (matching MeshGEMM structure):
 #   Pass 1: summa_host(0, 1)  — correctness check (P < 32 only)
 #   Pass 2: summa_host(5, 50) — performance timing (5 warmup, 50 timed runs)
+#
+# f16 memcpy convention (MEMCPY_16BIT, sdkruntimepybind):
+#   h2d: view f16 as uint16, zero-extend to uint32 (1 element per word)
+#   d2h: truncate uint32 to uint16, view as float16
 
 import argparse
 import json
 import struct
 import numpy as np
 
-from cerebras.sdk.runtime.sdkruntimepybind import SdkRuntime     # pylint: disable=no-name-in-module
-from cerebras.sdk.runtime.sdkruntimepybind import MemcpyDataType # pylint: disable=no-name-in-module
-from cerebras.sdk.runtime.sdkruntimepybind import MemcpyOrder    # pylint: disable=no-name-in-module
+from cerebras.sdk.runtime.sdkruntimepybind import SdkRuntime      # pylint: disable=no-name-in-module
+from cerebras.sdk.runtime.sdkruntimepybind import MemcpyDataType  # pylint: disable=no-name-in-module
+from cerebras.sdk.runtime.sdkruntimepybind import MemcpyOrder     # pylint: disable=no-name-in-module
 
 
 def float_to_hex(f):
@@ -36,7 +29,7 @@ def make_u48(words):
     return int(words[0]) + (int(words[1]) << 16) + (int(words[2]) << 32)
 
 
-parser = argparse.ArgumentParser(description="SUMMA f32 host program")
+parser = argparse.ArgumentParser(description="SUMMA fp16 host program")
 parser.add_argument("--name",   required=True,         help="Compiled output directory")
 parser.add_argument("--cmaddr", default=None,          help="IP:port for CS system (omit for simulator)")
 # Optional: pass P/M/K/N explicitly (required for appliance launch where out.json
@@ -57,8 +50,8 @@ if args.P is not None:
     Kt = K // P
     Nt = N // P
 else:
-    with open(f"{args.name}/out.json", encoding="utf-8") as json_file:
-        compile_data = json.load(json_file)
+    with open(f"{args.name}/out.json", encoding="utf-8") as f:
+        compile_data = json.load(f)
     P  = int(compile_data["params"]["P"])
     Mt = int(compile_data["params"]["Mt"])
     Kt = int(compile_data["params"]["Kt"])
@@ -67,23 +60,23 @@ else:
     K  = Kt * P
     N  = Nt * P
 
-memcpy_dtype = MemcpyDataType.MEMCPY_32BIT
+io_dtype     = MemcpyDataType.MEMCPY_16BIT
 memcpy_order = MemcpyOrder.ROW_MAJOR
 
-# Use a deterministic seed so that CI results are predictable
-np.random.seed(seed=7)
+np.random.seed(2025)
+A = np.random.rand(M, K).astype(np.float16)
+B = np.random.rand(K, N).astype(np.float16)
 
-A = np.random.rand(M, K).astype(np.float32)
-B = np.random.rand(K, N).astype(np.float32)
-
-# Cliff distribution — column-major local tiles
+# Cliff distribution — column-major local tiles (same layout as f32 original)
 A1 = A.reshape(P, Mt, P, Kt)
-A2 = A1.transpose(0, 2, 3, 1)   # (P, P, Kt, Mt) col-major local
+A2 = A1.transpose(0, 2, 3, 1)       # (P, P, Kt, Mt) col-major local
 A3 = A2.reshape(P, P, Mt * Kt)
+A_u32 = A3.ravel().view(np.uint16).astype(np.uint32)
 
 B1 = B.reshape(P, Kt, P, Nt)
-B2 = B1.transpose(0, 2, 3, 1)   # (P, P, Nt, Kt) col-major local
+B2 = B1.transpose(0, 2, 3, 1)       # (P, P, Nt, Kt) col-major local
 B3 = B2.reshape(P, P, Kt * Nt)
+B_u32 = B3.ravel().view(np.uint16).astype(np.uint32)
 
 runner = SdkRuntime(args.name, cmaddr=args.cmaddr)
 sym_A           = runner.get_id("A")
@@ -99,11 +92,11 @@ C_1d_u32 = None
 
 try:
     # ── Send input tiles (once; tiles stay on device across both passes) ──────
-    runner.memcpy_h2d(sym_A, A3.ravel(), 0, 0, P, P, Mt * Kt,
-                      streaming=False, data_type=memcpy_dtype,
+    runner.memcpy_h2d(sym_A, A_u32, 0, 0, P, P, Mt * Kt,
+                      streaming=False, data_type=io_dtype,
                       order=memcpy_order, nonblock=False)
-    runner.memcpy_h2d(sym_B, B3.ravel(), 0, 0, P, P, Kt * Nt,
-                      streaming=False, data_type=memcpy_dtype,
+    runner.memcpy_h2d(sym_B, B_u32, 0, 0, P, P, Kt * Nt,
+                      streaming=False, data_type=io_dtype,
                       order=memcpy_order, nonblock=False)
 
     # --- Pass 1: correctness check (0 warmup, 1 repeat) ---
@@ -114,7 +107,7 @@ try:
     if P < 32:
         C_1d_u32 = np.zeros(P * P * Mt * Nt, dtype=np.uint32)
         runner.memcpy_d2h(C_1d_u32, sym_C, 0, 0, P, P, Mt * Nt,
-                          streaming=False, data_type=memcpy_dtype,
+                          streaming=False, data_type=io_dtype,
                           order=memcpy_order, nonblock=False)
 
     # --- Pass 2: performance timing (5 warmup, 50 repeats) ---
@@ -140,11 +133,12 @@ finally:
 # ── Correctness check (P < 32 only) ──────────────────────────────────────────
 if C_1d_u32 is not None:
     # Reconstruct global C from column-major tiles (inverse cliff distribution)
-    C3 = C_1d_u32.reshape(P, P, Nt, Mt)
+    C_fp16 = C_1d_u32.astype(np.uint16).view(np.float16)
+    C3 = C_fp16.reshape(P, P, Nt, Mt)
     C2 = C3.transpose(0, 3, 1, 2)   # (P, Mt, P, Nt)
-    C_device = C2.reshape(M, N).view(np.float32)
-    C_ref = np.dot(A, B)
-    np.testing.assert_allclose(C_ref, C_device, rtol=1e-05, atol=1e-06)
+    C_device = C2.reshape(M, N)
+    C_ref = np.dot(A.astype(np.float32), B.astype(np.float32)).astype(np.float16)
+    np.testing.assert_allclose(C_device, C_ref, rtol=0.05, atol=max(2.0, 0.02 * K))
     print("Correctness check PASSED")
 
 # ── Unpack 48-bit cycle counts ───────────────────────────────────────────────
@@ -156,13 +150,13 @@ for w in range(P):
         hex_t0 = int(float_to_hex(time_memcpy_hwl[h, w, 0]), base=16)
         hex_t1 = int(float_to_hex(time_memcpy_hwl[h, w, 1]), base=16)
         hex_t2 = int(float_to_hex(time_memcpy_hwl[h, w, 2]), base=16)
-        word[0] = hex_t0 & 0x0000FFFF
-        word[1] = (hex_t0 >> 16) & 0x0000FFFF
-        word[2] = hex_t1 & 0x0000FFFF
+        word[0] = hex_t0 & 0x0000ffff
+        word[1] = (hex_t0 >> 16) & 0x0000ffff
+        word[2] = hex_t1 & 0x0000ffff
         time_start[h, w] = make_u48(word)
-        word[0] = (hex_t1 >> 16) & 0x0000FFFF
-        word[1] = hex_t2 & 0x0000FFFF
-        word[2] = (hex_t2 >> 16) & 0x0000FFFF
+        word[0] = (hex_t1 >> 16) & 0x0000ffff
+        word[1] = hex_t2 & 0x0000ffff
+        word[2] = (hex_t2 >> 16) & 0x0000ffff
         time_end[h, w] = make_u48(word)
 
 time_ref = np.zeros((P, P), dtype=np.int64)
@@ -171,9 +165,9 @@ for w in range(P):
     for h in range(P):
         hex_t0 = int(float_to_hex(time_ref_hwl[h, w, 0]), base=16)
         hex_t1 = int(float_to_hex(time_ref_hwl[h, w, 1]), base=16)
-        word[0] = hex_t0 & 0x0000FFFF
-        word[1] = (hex_t0 >> 16) & 0x0000FFFF
-        word[2] = hex_t1 & 0x0000FFFF
+        word[0] = hex_t0 & 0x0000ffff
+        word[1] = (hex_t0 >> 16) & 0x0000ffff
+        word[2] = hex_t1 & 0x0000ffff
         time_ref[h, w] = make_u48(word)
 
 # Correct for per-PE clock skew and memcpy wavefront offset

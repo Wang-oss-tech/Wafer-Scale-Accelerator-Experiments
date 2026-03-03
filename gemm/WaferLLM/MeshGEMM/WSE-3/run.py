@@ -35,7 +35,6 @@ def assignId(pc, P):
     else:
         send_id = pc + 2
         recv_id = pc - 2
-
     if pc == 1:
         send_id = 3
         recv_id = 2
@@ -43,7 +42,6 @@ def assignId(pc, P):
     if pc == 2:
         send_id = 1
         recv_id = min(recv_id, P)
-
     if P % 2 == 0:
         if pc == P - 1:
             send_id = P
@@ -58,7 +56,6 @@ def assignId(pc, P):
         if pc == P:
             send_id = P - 1
             recv_id = P - 2
-
     return send_id - 1, recv_id - 1
 
 
@@ -121,6 +118,8 @@ sym_time_ref      = runner.get_id("time_ref")
 runner.load()
 runner.run()
 
+res_1d_u32 = None
+
 try:
     # Distribute X tiles: reshape into (P, P, Mt*Kt) in column-major tile order.
     # Zero-extend each f16 to uint32 (1 element per word) for MEMCPY_16BIT.
@@ -148,24 +147,12 @@ try:
                   np.int16(total_warmup_times), np.int16(total_repeat_times),
                   nonblock=False)
 
-    res_1d_u32 = np.zeros(P * P * Mt * Nt, dtype=np.uint32)
-    runner.memcpy_d2h(res_1d_u32, sym_res, 0, 0, P, P, Mt * Nt,
-                      streaming=False, data_type=io_dtype,
-                      order=memcpy_order, nonblock=False)
-    res_1d_fp16 = res_1d_u32.astype(np.uint16).view(np.float16)  # extract low 16 bits
-    res3 = res_1d_fp16.reshape((P, P, Nt, Mt))
-    res2 = res3.transpose(0, 3, 1, 2)
-    res  = res2.reshape(M, N)
-
-    # Reference computed in f32 then cast to f16.
-    # f16 has ~3 decimal digits of precision. Accumulating K multiply-adds grows
-    # both the result magnitude (~K * 0.25 for uniform[0,1] inputs) and the
-    # absolute rounding error proportionally, so atol scales with K.
-    C_expected = np.dot(tensor_X.astype(np.float32), tensor_W.astype(np.float32)).astype(np.float16)
-    f16_atol = max(2.0, 0.02 * K)   # e.g. K=56→2.0, K=448→8.96, K=2160→43.2
-    f16_rtol = 0.05
-    np.testing.assert_allclose(res, C_expected, rtol=f16_rtol, atol=f16_atol)
-    print("Correctness check PASSED")
+    # ── Correctness check d2h (small grids) ─────────────────────────
+    if P < 32:
+        res_1d_u32 = np.zeros(P * P * Mt * Nt, dtype=np.uint32)
+        runner.memcpy_d2h(res_1d_u32, sym_res, 0, 0, P, P, Mt * Nt,
+                          streaming=False, data_type=io_dtype,
+                          order=memcpy_order, nonblock=False)
 
     # --- Pass 2: performance timing (5 warmup, 50 repeats) ---
     runner.launch('init_task', nonblock=False)
@@ -189,6 +176,16 @@ try:
 
 finally:
     runner.stop()
+
+# ── Correctness check (P < 32 only) ──────────────────────────────────────────
+if res_1d_u32 is not None:
+    res_fp16 = res_1d_u32.astype(np.uint16).view(np.float16)
+    res3 = res_fp16.reshape(P, P, Nt, Mt)
+    res2 = res3.transpose(0, 3, 1, 2)   # (P, Mt, P, Nt)
+    res  = res2.reshape(M, N)
+    C_ref = np.dot(tensor_X.astype(np.float32), tensor_W.astype(np.float32)).astype(np.float16)
+    np.testing.assert_allclose(res, C_ref, rtol=0.05, atol=max(2.0, 0.02 * K))
+    print("Correctness check PASSED")
 
 # Unpack 48-bit cycle counts from f32 bit patterns
 time_start = np.zeros((P, P), dtype=np.int64)

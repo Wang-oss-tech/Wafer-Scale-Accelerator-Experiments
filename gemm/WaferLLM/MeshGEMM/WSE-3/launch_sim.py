@@ -135,17 +135,18 @@ def main():
     total_warmup_times, total_repeat_times = 0, 1
     runner.launch('meshgemm_host', np.int16(total_warmup_times), np.int16(total_repeat_times), nonblock=False)
     
-    res3_1d_u32 = np.zeros(M*N, dtype=np.uint32)
-    runner.memcpy_d2h(res3_1d_u32, sym_res, 0, 0, P, P, Mt*Nt, \
-                      streaming=False, data_type=io_dtype, order=memcpy_order, nonblock=False)
-    res3_1d_fp16 = memcpy_view(res3_1d_u32, np.dtype(np.float16))
-    res3 = res3_1d_fp16.reshape((P, P, Nt, Mt))
-    res2 = res3.transpose(0, 3, 1, 2)
-    res = res2.reshape(M, N)
+    # res3_1d_u32 = np.zeros(M*N, dtype=np.uint32)
+    # runner.memcpy_d2h(res3_1d_u32, sym_res, 0, 0, P, P, Mt*Nt, \
+    #                   streaming=False, data_type=io_dtype, order=memcpy_order, nonblock=False)
+    # res3_1d_fp16 = memcpy_view(res3_1d_u32, np.dtype(np.float16))
+    # res3 = res3_1d_fp16.reshape((P, P, Nt, Mt))
+    # res2 = res3.transpose(0, 3, 1, 2)
+    # res = res2.reshape(M, N)
     
-    runner.launch('init_task', nonblock=False)
-    total_warmup_times, total_repeat_times = 1, 5
-    runner.launch('meshgemm_host', np.int16(total_warmup_times), np.int16(total_repeat_times), nonblock=False)
+    # runner.launch('init_task', nonblock=False)
+    # total_warmup_times, total_repeat_times = 1, 5
+    # total_warmup_times, total_repeat_times = 5, 50
+    # runner.launch('meshgemm_host', np.int16(total_warmup_times), np.int16(total_repeat_times), nonblock=False)
     
     time_memcpy_1d_f32 = np.zeros(P*P*3, dtype=np.float32)
     runner.memcpy_d2h(time_memcpy_1d_f32, symbol_time_memcpy, 0, 0, P, P, 3, streaming=False,
@@ -197,10 +198,10 @@ def main():
     
     expected_res = np.matmul(tensor_X, tensor_W)
     
-    print("Expected result:")
-    print(expected_res)
-    print("Actual result:")
-    print(res)
+    # print("Expected result:")
+    # print(expected_res)
+    # print("Actual result:")
+    # print(res)
     
     min_time_start = time_start.min()
     max_time_end = time_end.max()

@@ -1,0 +1,22 @@
+{
+    "cycle_count": 100386,
+    "cycles_per_second": 8697.46262077055,
+    "fabric_x": 11,
+    "fabric_y": 8,
+    "hwtile_count": 40,
+    "idle_ce_cycles": 17980,
+    "idle_wavelet_cycles": 18017,
+    "init_time": 0.11052513122558594,
+    "iotile_count": 4,
+    "nodes": 1,
+    "nultile_count": 82,
+    "sim_stop_cause": "Stop due to user request",
+    "sim_time": 11.54198694229126,
+    "simulated_tile_count": 44,
+    "sunset_count": 0,
+    "threads": 5,
+    "tile_count": 126,
+    "tile_cycles_per_second": 382688.3553139042,
+    "tile_cycles_per_second_per_thread": 76537.67106278084,
+    "total_time": 11.652512073516846
+}

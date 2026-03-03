@@ -10,8 +10,8 @@
                         ]
                     },
                     "addressBook": {
-                        "taskIpPort": "10.125.9.102:9000",
-                        "taskDebugAddress": "100.64.4.244:9002",
+                        "taskIpPort": "10.125.8.125:9000",
+                        "taskDebugAddress": "100.64.4.242:9002",
                         "taskNodeName": "cer-anl-net001-wk-sr03"
                     }
                 }

@@ -8,6 +8,9 @@ Nt=$(($4 / $1))
 
 echo "P=$1, M=$2, K=$3, N=$4, Mt=$Mt, Kt=$Kt, Nt=$Nt"
 
+# export SINGULARITYENV_SIMFABRIC_DEBUG=landing
+export SINGULARITYENV_SIMFABRIC_DEBUG=inst_trace
+
 cslc --arch=wse3 ./src/layout.csl --fabric-dims="$fabric_w","$fabric_h" --fabric-offsets=4,1 \
     --params=P:"$1",Mt:"$Mt",Kt:"$Kt",Nt:"$Nt" \
     -o out --memcpy --channels 1

@@ -9,13 +9,19 @@ param Nt: i16;
 
 // ---------------------- Input Matrix ------------------------ //
 
-var X_0_tile: [Mt*Kt]f16 = @zeros([Mt*Kt]f16);
-var X_1_tile: [Mt*Kt]f16 = @zeros([Mt*Kt]f16);
+// Round up to the nearest even number so the comm DSDs stay in-bounds
+// when Mt*Kt (or Kt*Nt) is odd.  The extra slot is always zero-initialised
+// and never touched by the compute loops.
+const _Mt_Kt_pad: i16 = ((Mt * Kt + 1) / 2) * 2;
+const _Kt_Nt_pad: i16 = ((Kt * Nt + 1) / 2) * 2;
+
+var X_0_tile: [_Mt_Kt_pad]f16 = @zeros([_Mt_Kt_pad]f16);
+var X_1_tile: [_Mt_Kt_pad]f16 = @zeros([_Mt_Kt_pad]f16);
 var ptr_X: [*]f16 = &X_0_tile;
 var X_dsd = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt} -> X_0_tile[i] });
 
-var W_0_tile: [Kt*Nt]f16 = @zeros([Kt*Nt]f16);
-var W_1_tile: [Kt*Nt]f16 = @zeros([Kt*Nt]f16);
+var W_0_tile: [_Kt_Nt_pad]f16 = @zeros([_Kt_Nt_pad]f16);
+var W_1_tile: [_Kt_Nt_pad]f16 = @zeros([_Kt_Nt_pad]f16);
 var ptr_W: [*]f16 = &W_0_tile;
 var W_dsd = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Nt} -> W_0_tile[i] });
 
@@ -142,17 +148,13 @@ fn mm_compute() void {
         W_dsd = @set_dsd_length(W_dsd, @bitcast(u16, Nt));
 
         for (@range(i16, Kt)) |k| {
-
             out_dsd = @set_dsd_base_addr(out_dsd, ptr_out);
-
             @load_to_dsr(out_dest_dsr, out_dsd, .{ .save_address = true });
             @load_to_dsr(out_src0_dsr, out_dsd, .{ .save_address = true });
             @load_to_dsr(X_src1_dsr, X_dsd, .{ .save_address = false });
             @map(gemv_static_step_X, W_dsd);
-
             X_dsd = @increment_dsd_offset(X_dsd, Mt, f16);
             W_dsd = @increment_dsd_offset(W_dsd, Nt, f16);
-
         }
 
         step += 1;

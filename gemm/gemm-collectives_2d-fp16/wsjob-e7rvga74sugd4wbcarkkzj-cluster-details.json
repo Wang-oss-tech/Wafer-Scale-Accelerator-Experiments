@@ -18,8 +18,8 @@
                 }
             ],
             "resourceInfo": {
-                "memoryBytes": "71940702208",
-                "cpuMillicore": "24000"
+                "memoryBytes": "68719476736",
+                "cpuMillicore": "48000"
             },
             "taskCommand": "python /cbcore/py_root/cerebras/sdk/appliance/sdk_appliance_server.py"
         }

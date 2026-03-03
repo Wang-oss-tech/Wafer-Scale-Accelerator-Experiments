@@ -116,6 +116,13 @@ task y_done() void {
 }
 
 var step: u16 = 0;
+
+// ── Multi-run state (for summa_host entry point) ──────────────────────────────
+var total_warmup_times: i16 = 0;
+var total_repeat_times: i16 = 1;
+var run_count: i16 = 0;
+var summa_host_mode: bool = false;
+
 fn main() void {
   @assert(step < P);
 
@@ -233,19 +240,72 @@ fn f_reference_timestamps() void {
 }
 
 task f_exit() void {
-  timestamp.get_timestamp(&tscEndBuffer);
-  timestamp.disable_tsc();
-  f_reference_timestamps();
-  f_memcpy_timestamps();
+  if (summa_host_mode) {
+    summa_entry();
+  } else {
+    timestamp.get_timestamp(&tscEndBuffer);
+    timestamp.disable_tsc();
+    f_reference_timestamps();
+    f_memcpy_timestamps();
 
-  prt.print_string("All SUMMA steps completed at location ");
-  prt.print_u16_decimal(px);
-  prt.print_string(",");
-  prt.print_u16_decimal(py);
-  prt.print_string("\n");
+    prt.print_string("All SUMMA steps completed at location ");
+    prt.print_u16_decimal(px);
+    prt.print_string(",");
+    prt.print_u16_decimal(py);
+    prt.print_string("\n");
 
-  // the user must unblock cmd color for every PE
-  sys_mod.unblock_cmd_stream();
+    sys_mod.unblock_cmd_stream();
+  }
+}
+
+// ── On-device inner run start (used by summa_host's loop) ────────────────────
+fn run_start_inner() void {
+  mpi_x.init();
+  mpi_y.init();
+  for (@range(i16, Mt * Nt)) |i| { C_tile[i] = 0.0; }
+  step = 0;
+  @block(compute_task_id);
+  const Ap = if (px == step) &A_tile else &A_buffer;
+  const Bp = if (py == step) &B_tile else &B_buffer;
+  mpi_x.broadcast(step, @ptrcast([*]u32, Ap), Mt * Kt, x_task_id);
+  mpi_y.broadcast(step, @ptrcast([*]u32, Bp), Kt * Nt, y_task_id);
+}
+
+// ── summa_entry: decides whether to start another run or finish ───────────────
+fn summa_entry() void {
+  if (run_count == total_warmup_times + total_repeat_times) {
+    timestamp.get_timestamp(&tscEndBuffer);
+    timestamp.disable_tsc();
+    f_reference_timestamps();
+    f_memcpy_timestamps();
+    sys_mod.unblock_cmd_stream();
+    return;
+  }
+  if (run_count == total_warmup_times) {
+    timestamp.get_timestamp(&tscStartBuffer);
+  }
+  run_count += 1;
+  run_start_inner();
+}
+
+// ── summa_host: on-device warmup+repeat loop ─────────────────────────────────
+// Timestamps span all total_repeat_times timed runs with no host round-trip.
+// Divide reported (end - start) by total_repeat_times for per-run time.
+fn summa_host(total_warmup_times_: i16, total_repeat_times_: i16) void {
+  total_warmup_times = total_warmup_times_;
+  total_repeat_times = total_repeat_times_;
+  run_count = 0;
+  summa_host_mode = true;
+
+  mpi_x.init();
+  mpi_y.init();
+  px = mpi_x.pe_id;
+  py = mpi_y.pe_id;
+
+  timestamp.enable_tsc();
+  timestamp.get_timestamp(&tscRefBuffer);
+
+  summa_entry();
 }
 
 comptime {
@@ -260,4 +320,5 @@ comptime {
   @export_symbol(ptr_time_memcpy, "time_memcpy");
   @export_symbol(ptr_time_ref, "time_ref");
   @export_symbol(main);
+  @export_symbol(summa_host);
 }

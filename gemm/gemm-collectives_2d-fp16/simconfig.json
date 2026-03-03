@@ -14,7 +14,9 @@
     },
     "mode": ""
   },
-  "debug": [],
+  "debug": [
+    "inst_trace"
+  ],
   "delayedQueueService": 0,
   "dieModel": {
     "latency": 0,
