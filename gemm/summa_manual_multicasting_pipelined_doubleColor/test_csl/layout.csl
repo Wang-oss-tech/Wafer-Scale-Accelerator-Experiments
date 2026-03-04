@@ -48,9 +48,5 @@ layout {
   @export_name("A", [*]f32, true);
   @export_name("B", [*]f32, true);
   @export_name("C", [*]f32, true);
-  @export_name("time_memcpy", [*]f32, true);
-  @export_name("time_ref",    [*]f32, true);
-  @export_name("main",        fn()void);
-  @export_name("reset",       fn()void);
-  @export_name("summa_host",  fn(i16, i16)void);
+  @export_name("main", fn()void);
 }
