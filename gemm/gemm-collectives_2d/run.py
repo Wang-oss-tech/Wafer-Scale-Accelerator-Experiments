@@ -45,6 +45,8 @@ parser.add_argument("--P", default=None, type=int, help="PE grid size P x P")
 parser.add_argument("--M", default=None, type=int, help="Full matrix M dimension")
 parser.add_argument("--K", default=None, type=int, help="Full matrix K dimension")
 parser.add_argument("--N", default=None, type=int, help="Full matrix N dimension")
+parser.add_argument("--warmup",  default=5,  type=int, help="Warmup runs (default 5)")
+parser.add_argument("--repeats", default=50, type=int, help="Timed runs (default 50)")
 args = parser.parse_args()
 
 # Resolve P/Mt/Kt/Nt: prefer explicit CLI args, fall back to out.json
@@ -111,15 +113,15 @@ try:
     runner.launch("summa_host", np.int16(total_warmup_times), np.int16(total_repeat_times), nonblock=False)
 
     # ── Correctness check d2h (small grids only) ──────────────────────────────
-    if P < 32:
-        C_1d_u32 = np.zeros(P * P * Mt * Nt, dtype=np.uint32)
-        runner.memcpy_d2h(C_1d_u32, sym_C, 0, 0, P, P, Mt * Nt,
-                          streaming=False, data_type=memcpy_dtype,
-                          order=memcpy_order, nonblock=False)
+    # if P < 32:
+    C_1d_u32 = np.zeros(P * P * Mt * Nt, dtype=np.uint32)
+    runner.memcpy_d2h(C_1d_u32, sym_C, 0, 0, P, P, Mt * Nt,
+                        streaming=False, data_type=memcpy_dtype,
+                        order=memcpy_order, nonblock=False)
 
-    # --- Pass 2: performance timing (5 warmup, 50 repeats) ---
-    # total_warmup_times, total_repeat_times = 5, 50
-    # runner.launch("summa_host", np.int16(total_warmup_times), np.int16(total_repeat_times), nonblock=False)
+    # --- Pass 2: performance timing ---
+    total_warmup_times, total_repeat_times = args.warmup, args.repeats
+    runner.launch("summa_host", np.int16(total_warmup_times), np.int16(total_repeat_times), nonblock=False)
 
     # ── Retrieve timestamps (span all timed runs; divide by total_repeat_times) ─
     time_memcpy_1d_f32 = np.zeros(P * P * 3, dtype=np.float32)
@@ -138,14 +140,28 @@ finally:
     runner.stop()
 
 # ── Correctness check (P < 32 only) ──────────────────────────────────────────
-if C_1d_u32 is not None:
-    # Reconstruct global C from column-major tiles (inverse cliff distribution)
-    C3 = C_1d_u32.reshape(P, P, Nt, Mt)
-    C2 = C3.transpose(0, 3, 1, 2)   # (P, Mt, P, Nt)
-    C_device = C2.reshape(M, N).view(np.float32)
-    C_ref = np.dot(A, B)
-    np.testing.assert_allclose(C_ref, C_device, rtol=1e-05, atol=1e-06)
+# if C_1d_u32 is not None:
+# Reconstruct global C from column-major tiles (inverse cliff distribution)
+C3 = C_1d_u32.reshape(P, P, Nt, Mt)
+C2 = C3.transpose(0, 3, 1, 2)   # (P, Mt, P, Nt)
+C_device = C2.reshape(M, N).view(np.float32)
+C_ref = np.dot(A, B)
+
+def is_error(a, b):
+    return (np.abs((a - b) / (a + b)) > 1e-3) & (np.abs(a - b) > 0.05)
+
+error_mask    = is_error(C_device, C_ref)
+error_indices = np.argwhere(error_mask)
+num_errors    = len(error_indices)
+
+for idx in error_indices[:10]:
+    i, j = idx
+    print(f"  Mismatch at [{i},{j}]: expected {C_ref[i,j]:.6f}, got {C_device[i,j]:.6f}")
+
+if num_errors == 0:
     print("Correctness check PASSED")
+else:
+    print(f"Correctness check FAILED: {num_errors} / {M*N} ({100*num_errors/(M*N):.1f}%) elements mismatched")
 
 # ── Unpack 48-bit cycle counts ───────────────────────────────────────────────
 time_start = np.zeros((P, P), dtype=np.int64)

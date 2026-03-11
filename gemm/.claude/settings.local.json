@@ -11,7 +11,16 @@
       "Bash(done)",
       "Bash(bash:*)",
       "Bash(./commands_wse2.sh:*)",
-      "Bash(./commands_wse3.sh:*)"
+      "Bash(./commands_wse3.sh:*)",
+      "Bash(grep:*)",
+      "Bash(cat:*)",
+      "Bash(cslc:*)",
+      "Bash(cs_python:*)",
+      "Bash(git show:*)",
+      "Bash(tail:*)",
+      "Bash(cs_readelf:*)",
+      "Bash(sort -t= -k2 -n)",
+      "Bash(export:*)"
     ]
   }
 }

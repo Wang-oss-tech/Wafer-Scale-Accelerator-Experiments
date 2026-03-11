@@ -3,10 +3,10 @@
 set -e
 
 # export SINGULARITYENV_SIMFABRIC_DEBUG=landing
-export SINGULARITYENV_SIMFABRIC_DEBUG=inst_trace
+# export SINGULARITYENV_SIMFABRIC_DEBUG=inst_trace
 
-cslc --arch=wse3 ./layout.csl --fabric-dims=11,8 --fabric-offsets=4,1 \
+cslc --arch=wse3 ./layout.csl --fabric-dims=11,6 --fabric-offsets=4,1 \
 --params=P:4,Mt:14,Kt:14,Nt:14 \
 --memcpy --channels=1 -o out
 
-cs_python run.py --name out
+cs_python run.py --name out --repeats 1 --warmup 0

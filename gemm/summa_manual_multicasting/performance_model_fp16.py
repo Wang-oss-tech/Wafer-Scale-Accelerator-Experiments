@@ -1,7 +1,10 @@
+import math
+
 def compute_iter(Mt, Kt, Nt):
       d = bin((3 * Kt >> 1) ^ (Kt >> 1)).count('1')
       b_load = 2 * d - 1 - (Kt % 2) + 8
-      fmacs = (Mt+1) * 2  # 2 cycles per element (execute + idle on avg)
+      fmacs = 4 + math.ceil(Mt / 8) # latency between issue and executing, 8 FMAC units
+      # print("fmacs count", fmacs, "math.ceil", math.ceil(Mt/8))
       dsd_increment = 14 + 3   # 12 ST16 + 2 ADD16 + 3 NOP
       loop_control = 3  # SUB16 + MOV16 + JNC
       return Kt * Nt * (b_load + fmacs + dsd_increment + loop_control)
@@ -43,7 +46,7 @@ def total_cycles(P, Mt, Kt, Nt):
 
 # Test with measured configuration
 if __name__ == "__main__":
-      P, Mt, Kt, Nt = 4, 14, 14, 14
+      P, Mt, Kt, Nt = 180, 12, 12, 12
       
       print(f"Configuration: P={P}, Mt={Mt}, Kt={Kt}, Nt={Nt}")
       print(f"H2D cycles: {h2d_memcpy(P, Mt, Kt, Nt)}")
@@ -54,7 +57,6 @@ if __name__ == "__main__":
       print(f"Kernel cycles: {kernel}")
       print(f"IO cycles: {io}")
       print(f"Total cycles: {total}")
-
 
 
 

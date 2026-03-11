@@ -24,7 +24,7 @@ param B_BCAST_DONE_ID: local_task_id;
 param COMPUTE_DONE_ID: local_task_id;
 
 const sys_mod = @import_module("<memcpy/memcpy>", memcpy_params);
-const layout_mod = @import_module("<layout>");
+const layout_mod = @import_module("<layout>"); 
 const prt = @import_module("<simprint>");
 
 // ============================================================================

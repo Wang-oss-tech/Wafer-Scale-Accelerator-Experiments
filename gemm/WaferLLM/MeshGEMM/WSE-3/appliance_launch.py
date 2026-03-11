@@ -11,6 +11,8 @@ def parse_args():
     parser.add_argument("--M", required=True, type=int, help="Input context length")
     parser.add_argument("--K", required=True, type=int, help="Word vector dimension")
     parser.add_argument("--N", required=True, type=int, help="Output dimension")
+    parser.add_argument("--warmup",  default=5,  type=int, help="Warmup runs (default 5)")
+    parser.add_argument("--repeats", default=50, type=int, help="Timed runs (default 50)")
     parser.add_argument("--simulator", action="store_true", help="Run on simulator")
     return parser.parse_args()
 
@@ -38,7 +40,7 @@ with SdkLauncher(artifact_id, simulator=simulator, disable_version_check=True) a
     # launch_wse3.py used cerebras.sdk.client which is not installed on the worker.
     launcher.stage("run.py")
 
-    run_args = f"--name out --P {P} --M {M} --K {K} --N {N}"
+    run_args = f"--name out --P {P} --M {M} --K {K} --N {N} --warmup {args.warmup} --repeats {args.repeats}"
 
     # run.py uses sdkruntimepybind.SdkRuntime(name, cmaddr=...) so --cmaddr is
     # required for real hardware; not allowed for simulator.

@@ -1,0 +1,27 @@
+{
+    "tasks": [
+        {
+            "taskType": "CRD",
+            "taskMap": [
+                {
+                    "taskId": {
+                        "wseId": -1,
+                        "wseIds": [
+                            -1
+                        ]
+                    },
+                    "addressBook": {
+                        "taskIpPort": "10.125.9.105:9000",
+                        "taskDebugAddress": "100.64.5.28:9002",
+                        "taskNodeName": "cer-anl-net001-mg-sr01"
+                    }
+                }
+            ],
+            "resourceInfo": {
+                "memoryBytes": "68719476736",
+                "cpuMillicore": "48000"
+            },
+            "taskCommand": "python /cbcore/py_root/cerebras/sdk/appliance/sdk_appliance_server.py"
+        }
+    ]
+}

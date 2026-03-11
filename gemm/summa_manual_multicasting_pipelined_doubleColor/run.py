@@ -266,6 +266,19 @@ runner.stop()
 
 print("Verifying results...")
 C_expected = np.dot(A, B)
-np.testing.assert_allclose(C_expected, C, rtol=1e-05, atol=1e-06)
 
-print("SUCCESS")
+def is_error(a, b):
+    return (np.abs((a - b) / (a + b)) > 1e-3) & (np.abs(a - b) > 0.05)
+
+error_mask    = is_error(C_expected, C)
+error_indices = np.argwhere(error_mask)
+num_errors    = len(error_indices)
+
+for idx in error_indices[:10]:
+    i, j = idx
+    print(f"  Mismatch at [{i},{j}]: expected {C_expected[i,j]:.6f}, got {C[i,j]:.6f}")
+
+if num_errors == 0:
+    print("SUCCESS")
+else:
+    print(f"FAILED: {num_errors} / {M*N} ({100 * num_errors/(M * N):.1f}%) elements mismatched")

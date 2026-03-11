@@ -92,25 +92,25 @@ var time_ref_f32   = @zeros([2]f32);
 var ptr_time_ref:   [*]f32 = &time_ref_f32;
 
 task x_done() void {
-  prt.print_string("X broadcast ");
-  prt.print_u16_decimal(step);
-  prt.print_string(" completed at location ");
-  prt.print_u16_decimal(px);
-  prt.print_string(",");
-  prt.print_u16_decimal(py);
-  prt.print_string("\n");
+  // prt.print_string("X broadcast ");
+  // prt.print_u16_decimal(step);
+  // prt.print_string(" completed at location ");
+  // prt.print_u16_decimal(px);
+  // prt.print_string(",");
+  // prt.print_u16_decimal(py);
+  // prt.print_string("\n");
   
   @activate(compute_task_id);
 }
 
 task y_done() void {
-  prt.print_string("Y broadcast ");
-  prt.print_u16_decimal(step);
-  prt.print_string(" completed at location ");
-  prt.print_u16_decimal(px);
-  prt.print_string(",");
-  prt.print_u16_decimal(py);
-  prt.print_string("\n");
+  // prt.print_string("Y broadcast ");
+  // prt.print_u16_decimal(step);
+  // prt.print_string(" completed at location ");
+  // prt.print_u16_decimal(px);
+  // prt.print_string(",");
+  // prt.print_u16_decimal(py);
+  // prt.print_string("\n");
   
   @unblock(compute_task_id);
 }
@@ -138,20 +138,20 @@ fn main() void {
     timestamp.get_timestamp(&tscRefBuffer);
     timestamp.get_timestamp(&tscStartBuffer);
     
-    prt.print_string("Main entry at location ");
-    prt.print_u16_decimal(px);
-    prt.print_string(",");
-    prt.print_u16_decimal(py);
-    prt.print_string("\n");
+    // prt.print_string("Main entry at location ");
+    // prt.print_u16_decimal(px);
+    // prt.print_string(",");
+    // prt.print_u16_decimal(py);
+    // prt.print_string("\n");
   }
 
-  prt.print_string("Starting broadcast ");
-  prt.print_u16_decimal(step);
-  prt.print_string(" at location ");
-  prt.print_u16_decimal(px);
-  prt.print_string(",");
-  prt.print_u16_decimal(py);
-  prt.print_string("\n");
+  // prt.print_string("Starting broadcast ");
+  // prt.print_u16_decimal(step);
+  // prt.print_string(" at location ");
+  // prt.print_u16_decimal(px);
+  // prt.print_string(",");
+  // prt.print_u16_decimal(py);
+  // prt.print_string("\n");
 
   // Communicate along both rows and columns
   const Ap = if (px == step) &A_tile else &A_buffer;
@@ -161,13 +161,13 @@ fn main() void {
 }
 
 task compute() void {
-  prt.print_string("Starting GEMM ");
-  prt.print_u16_decimal(step);
-  prt.print_string(" location ");
-  prt.print_u16_decimal(px);
-  prt.print_string(",");
-  prt.print_u16_decimal(py);
-  prt.print_string("\n");
+  // prt.print_string("Starting GEMM ");
+  // prt.print_u16_decimal(step);
+  // prt.print_string(" location ");
+  // prt.print_u16_decimal(px);
+  // prt.print_string(",");
+  // prt.print_u16_decimal(py);
+  // prt.print_string("\n");
   
   const Ap = if (px == step) &A_tile else &A_buffer;
   const Bp = if (py == step) &B_tile else &B_buffer;
@@ -187,13 +187,13 @@ task compute() void {
     A_dsd = @increment_dsd_offset(A_dsd, Mt, f32);
   }
 
-  prt.print_string("Ending GEMM ");
-  prt.print_u16_decimal(step);
-  prt.print_string(" location ");
-  prt.print_u16_decimal(px);
-  prt.print_string(",");
-  prt.print_u16_decimal(py);
-  prt.print_string("\n");
+  // prt.print_string("Ending GEMM ");
+  // prt.print_u16_decimal(step);
+  // prt.print_string(" location ");
+  // prt.print_u16_decimal(px);
+  // prt.print_string(",");
+  // prt.print_u16_decimal(py);
+  // prt.print_string("\n");
 
   step += 1;
   @block(compute_task_id);
@@ -248,11 +248,11 @@ task f_exit() void {
     f_reference_timestamps();
     f_memcpy_timestamps();
 
-    prt.print_string("All SUMMA steps completed at location ");
-    prt.print_u16_decimal(px);
-    prt.print_string(",");
-    prt.print_u16_decimal(py);
-    prt.print_string("\n");
+    // prt.print_string("All SUMMA steps completed at location ");
+    // prt.print_u16_decimal(px);
+    // prt.print_string(",");
+    // prt.print_u16_decimal(py);
+    // prt.print_string("\n");
 
     sys_mod.unblock_cmd_stream();
   }

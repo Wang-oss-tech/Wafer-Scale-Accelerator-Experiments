@@ -67,9 +67,14 @@ var px: u16 = 0;
 var py: u16 = 0;
 
 // Home tiles (populated by host)
+// NOTE: All A/B receive buffers are declared BEFORE C_tile so they land at
+// addr%8==0.  A 4-byte pad then puts C_tile at addr%8==4, satisfying the
+// SIMD no-bank-conflict condition for @fmacs(C_dsd, C_dsd, A_dsd, b):
+//   (src0_addr % 8) == ((src1_addr + 4) % 8)  →  4 == (0+4)%8  ✓
+// Without this, all arrays land at addr%8==0 (each is 784=98×8 bytes) and
+// every @fmacs incurs a one-cycle bank-conflict penalty.
 var A_tile = @zeros([Mt * Kt]f32);
 var B_tile = @zeros([Kt * Nt]f32);
-var C_tile = @zeros([Mt * Nt]f32);
 
 // Double buffers: even steps → buf_0, odd steps → buf_1
 var A_recv_0 = @zeros([Mt * Kt]f32);
@@ -77,10 +82,16 @@ var A_recv_1 = @zeros([Mt * Kt]f32);
 var B_recv_0 = @zeros([Kt * Nt]f32);
 var B_recv_1 = @zeros([Kt * Nt]f32);
 
+// 4-byte pad: shifts C_tile to addr%8==4 while all A buffers stay at addr%8==0.
+// Declared as [1]f32 (not u32) and exported so the compiler cannot remove it.
+var _c_bank_pad = @zeros([1]f32);
+var C_tile = @zeros([Mt * Nt]f32);
+
 // Pointers for export
 var ptr_A: [*]f32 = &A_tile;
 var ptr_B: [*]f32 = &B_tile;
 var ptr_C: [*]f32 = &C_tile;
+var ptr_pad: [*]f32 = &_c_bank_pad;
 
 // ============================================================================
 // Timestamps
@@ -548,6 +559,7 @@ comptime {
     @export_symbol(ptr_A, "A");
     @export_symbol(ptr_B, "B");
     @export_symbol(ptr_C, "C");
+    @export_symbol(ptr_pad, "_pad");
     @export_symbol(ptr_time_memcpy, "time_memcpy");
     @export_symbol(ptr_time_ref,    "time_ref");
     @export_symbol(main);
