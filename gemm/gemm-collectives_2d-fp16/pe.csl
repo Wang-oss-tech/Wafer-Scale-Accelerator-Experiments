@@ -207,7 +207,7 @@ fn run_start_inner() void {
 fn summa_entry() void {
   if (run_count == total_warmup_times + total_repeat_times) {
     // All runs complete — capture end timestamp and hand control back to host.
-    timestamp.get_timestamp(&tscEndBuffer);
+    timestamp.get_timestamp(&tscEndBuffer); // end timer 
     timestamp.disable_tsc();
     f_reference_timestamps();
     f_memcpy_timestamps();
@@ -216,7 +216,7 @@ fn summa_entry() void {
   }
   if (run_count == total_warmup_times) {
     // Warmup complete — capture start timestamp for the timed runs.
-    timestamp.get_timestamp(&tscStartBuffer);
+    timestamp.get_timestamp(&tscStartBuffer); // tic inside
   }
   run_count += 1;
   run_start_inner();
@@ -238,7 +238,7 @@ fn summa_host(total_warmup_times_: i16, total_repeat_times_: i16) void {
   py = mpi_y.pe_id;
 
   timestamp.enable_tsc();
-  timestamp.get_timestamp(&tscRefBuffer);
+  timestamp.get_timestamp(&tscRefBuffer); 
 
   summa_entry();
 }

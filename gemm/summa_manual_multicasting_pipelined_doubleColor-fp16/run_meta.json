@@ -1,0 +1,54 @@
+{
+    "compile_jobs": [
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-wkuufyeooad7sjo3rxgfel",
+            "workflow_id": "wflow-5lxg54prcrarvfc2u2w2u277bu",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-wkuufyeooad7sjo3rxgfel",
+            "start_time": "2026-03-12T16:35:40Z",
+            "scheduled_time": "2026-03-12T16:36:00Z",
+            "software_versions": {
+                "appliance-client": "2.9.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse001-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            },
+            "coordinator_ip_port": "10.125.9.153:9000"
+        }
+    ],
+    "execute_jobs": [
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-nvhoatxsfn4ij7hezaxhzs",
+            "workflow_id": "wflow-2isih7pjzfbkjhnhuzb2wjrnyq",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-nvhoatxsfn4ij7hezaxhzs",
+            "start_time": "2026-03-12T16:36:30Z",
+            "scheduled_time": "2026-03-12T16:36:50Z",
+            "software_versions": {
+                "appliance-client": "2.9.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse002-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        }
+    ]
+}

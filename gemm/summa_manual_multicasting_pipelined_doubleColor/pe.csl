@@ -584,9 +584,13 @@ param b_odd_color: color;
 param EXIT_TASK_ID: local_task_id;
 param COMPUTE_DONE_ID: local_task_id;
 
+// Local task used to restart the pipeline between runs
+const RESTART_ID: local_task_id = @get_local_task_id(12);
+
 const sys_mod = @import_module("<memcpy/memcpy>", memcpy_params);
 const layout_mod = @import_module("<layout>");
 const prt = @import_module("<simprint>");
+const timestamp = @import_module("<time>");
 
 // ============================================================================
 // Color Config Register Access
@@ -635,6 +639,27 @@ var B_recv_1 = @zeros([Kt * Nt]f32);
 var ptr_A: [*]f32 = &A_tile;
 var ptr_B: [*]f32 = &B_tile;
 var ptr_C: [*]f32 = &C_tile;
+
+// ============================================================================
+// Timestamps
+// ============================================================================
+
+var tscStartBuffer = @zeros([timestamp.tsc_size_words]u16);
+var tscEndBuffer   = @zeros([timestamp.tsc_size_words]u16);
+var tscRefBuffer   = @zeros([timestamp.tsc_size_words]u16);
+var time_buf_f32   = @zeros([3]f32);
+var ptr_time_memcpy: [*]f32 = &time_buf_f32;
+var time_ref_f32   = @zeros([2]f32);
+var ptr_time_ref:   [*]f32 = &time_ref_f32;
+
+// ============================================================================
+// Multi-run state
+// ============================================================================
+
+var total_warmup_times: i16 = 0;
+var total_repeat_times: i16 = 1;
+var run_count: i16 = 0;
+var summa_host_mode: bool = false;
 
 
 // ============================================================================
@@ -944,7 +969,99 @@ task run_pipeline() void {
     // Last GEMM — no more broadcasts needed
     do_gemm(P - 1);
 
+    if (!summa_host_mode) {
+        timestamp.get_timestamp(&tscEndBuffer);
+        timestamp.disable_tsc();
+        f_reference_timestamps();
+        f_memcpy_timestamps();
+        sys_mod.unblock_cmd_stream();
+    } else {
+        summa_entry();
+    }
+}
+
+// ============================================================================
+// Timestamp packing
+// ============================================================================
+
+fn f_memcpy_timestamps() void {
+    var lo_: u16 = 0;
+    var hi_: u16 = 0;
+
+    lo_ = tscStartBuffer[0]; hi_ = tscStartBuffer[1];
+    time_buf_f32[0] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+
+    lo_ = tscStartBuffer[2]; hi_ = tscEndBuffer[0];
+    time_buf_f32[1] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+
+    lo_ = tscEndBuffer[1]; hi_ = tscEndBuffer[2];
+    time_buf_f32[2] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+}
+
+fn f_reference_timestamps() void {
+    var lo_: u16 = 0;
+    var hi_: u16 = 0;
+
+    lo_ = tscRefBuffer[0]; hi_ = tscRefBuffer[1];
+    time_ref_f32[0] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+
+    lo_ = tscRefBuffer[2]; hi_ = 0;
+    time_ref_f32[1] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+}
+
+// ============================================================================
+// Reset — zeros C_tile so host can re-run without reloading
+// ============================================================================
+
+fn reset() void {
+    for (@range(i16, Mt * Nt)) |i| { C_tile[@as(u16, i)] = 0.0; }
     sys_mod.unblock_cmd_stream();
+}
+
+// ============================================================================
+// Multi-run helpers (summa_host)
+// ============================================================================
+
+// restart_task: activated AFTER run_pipeline exits (clean task context).
+// Zeros accumulator and kicks off step-0 broadcasts for the next run.
+task restart_task() void {
+    for (@range(i16, Mt * Nt)) |i| { C_tile[@as(u16, i)] = 0.0; }
+    start_broadcast_0();
+}
+
+// Decides whether to start another run or capture final timestamps and finish.
+fn summa_entry() void {
+    if (run_count == total_warmup_times + total_repeat_times) {
+        timestamp.get_timestamp(&tscEndBuffer);
+        timestamp.disable_tsc();
+        f_reference_timestamps();
+        f_memcpy_timestamps();
+        sys_mod.unblock_cmd_stream();
+        return;
+    }
+    if (run_count == total_warmup_times) {
+        timestamp.get_timestamp(&tscStartBuffer);
+    }
+    run_count += 1;
+    @activate(RESTART_ID);
+}
+
+// On-device warmup+repeat loop. Device timestamps span all timed runs with
+// no host round-trip between runs; divide reported (end - start) by
+// total_repeat_times to get per-run cycle count.
+fn summa_host(total_warmup_times_: i16, total_repeat_times_: i16) void {
+    total_warmup_times = total_warmup_times_;
+    total_repeat_times = total_repeat_times_;
+    run_count = 0;
+    summa_host_mode = true;
+
+    px = @as(u16, layout_mod.get_x_coord());
+    py = @as(u16, layout_mod.get_y_coord());
+
+    timestamp.enable_tsc();
+    timestamp.get_timestamp(&tscRefBuffer);
+
+    summa_entry();
 }
 
 // ============================================================================
@@ -954,6 +1071,9 @@ task run_pipeline() void {
 fn main() void {
     px = @as(u16, layout_mod.get_x_coord());
     py = @as(u16, layout_mod.get_y_coord());
+    timestamp.enable_tsc();
+    timestamp.get_timestamp(&tscRefBuffer);
+    timestamp.get_timestamp(&tscStartBuffer);
     start_broadcast_0();
 }
 
@@ -990,9 +1110,14 @@ comptime {
 
     @bind_local_task(run_pipeline, COMPUTE_DONE_ID);
     @bind_local_task(exit_task, EXIT_TASK_ID);
+    @bind_local_task(restart_task, RESTART_ID);
 
     @export_symbol(ptr_A, "A");
     @export_symbol(ptr_B, "B");
     @export_symbol(ptr_C, "C");
+    @export_symbol(ptr_time_memcpy, "time_memcpy");
+    @export_symbol(ptr_time_ref,    "time_ref");
     @export_symbol(main);
+    @export_symbol(reset);
+    @export_symbol(summa_host);
 }

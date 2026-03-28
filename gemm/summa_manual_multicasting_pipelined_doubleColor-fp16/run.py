@@ -1,13 +1,14 @@
 #!/usr/bin/env cs_python
 
-# Host program for SUMMA GEMM (collectives_2d) — fp16 variant.
-# Adapted from gemm-collectives_2d (f32) for fair comparison with MeshGEMM.
+# SUMMA Matrix Multiplication with 4-Color Overlapped Broadcasts — fp16 variant
 #
-# Two-pass execution (matching MeshGEMM structure):
-#   Pass 1: summa_host(0, 1)  — correctness check (P < 32 only)
-#   Pass 2: summa_host(5, 50) — performance timing (5 warmup, 50 timed runs)
+# Adapted from summa_manual_multicasting_pipelined_doubleColor (f32).
 #
-# f16 memcpy convention (MEMCPY_16BIT, sdkruntimepybind):
+# Two-pass execution:
+#   Pass 1: summa_host(0, 1)  — correctness check
+#   Pass 2: summa_host(warmup, repeats) — performance timing
+#
+# f16 memcpy convention (MEMCPY_16BIT):
 #   h2d: view f16 as uint16, zero-extend to uint32 (1 element per word)
 #   d2h: truncate uint32 to uint16, view as float16
 
@@ -15,9 +16,9 @@ import argparse
 import json
 import numpy as np
 
-from cerebras.sdk.runtime.sdkruntimepybind import SdkRuntime      # pylint: disable=no-name-in-module
-from cerebras.sdk.runtime.sdkruntimepybind import MemcpyDataType  # pylint: disable=no-name-in-module
-from cerebras.sdk.runtime.sdkruntimepybind import MemcpyOrder     # pylint: disable=no-name-in-module
+from cerebras.sdk.runtime.sdkruntimepybind import SdkRuntime
+from cerebras.sdk.runtime.sdkruntimepybind import MemcpyDataType
+from cerebras.sdk.runtime.sdkruntimepybind import MemcpyOrder
 
 
 def f32_to_u32(x):
@@ -28,20 +29,17 @@ def make_u48(words):
     return int(words[0]) + (int(words[1]) << 16) + (int(words[2]) << 32)
 
 
-parser = argparse.ArgumentParser(description="SUMMA fp16 host program")
-parser.add_argument("--name",   required=True,         help="Compiled output directory")
-parser.add_argument("--cmaddr", default=None,          help="IP:port for CS system (omit for simulator)")
-# Optional: pass P/M/K/N explicitly (required for appliance launch where out.json
-# may not be present on the worker node; omit to read from out.json instead)
+parser = argparse.ArgumentParser(description="SUMMA fp16 4-color pipelined host program")
+parser.add_argument("--name",    required=True, help="compiled output directory")
+parser.add_argument("--cmaddr", default=None,   help="IP:port for CS system (omit for simulator)")
 parser.add_argument("--P", default=None, type=int, help="PE grid size P x P")
 parser.add_argument("--M", default=None, type=int, help="Full matrix M dimension")
 parser.add_argument("--K", default=None, type=int, help="Full matrix K dimension")
 parser.add_argument("--N", default=None, type=int, help="Full matrix N dimension")
-parser.add_argument("--warmup",  default=5,  type=int, help="Warmup runs (default 5)")
-parser.add_argument("--repeats", default=50, type=int, help="Timed runs (default 50)")
+parser.add_argument("--warmup",  default=5,  type=int, help="warmup runs (default 5)")
+parser.add_argument("--repeats", default=50, type=int, help="timed runs (default 50)")
 args = parser.parse_args()
 
-# Resolve P/Mt/Kt/Nt: prefer explicit CLI args, fall back to out.json
 if args.P is not None:
     P  = args.P
     M  = args.M
@@ -51,24 +49,30 @@ if args.P is not None:
     Kt = K // P
     Nt = N // P
 else:
-    with open(f"{args.name}/out.json", encoding="utf-8") as f:
-        compile_data = json.load(f)
-    P  = int(compile_data["params"]["P"])
-    Mt = int(compile_data["params"]["Mt"])
-    Kt = int(compile_data["params"]["Kt"])
-    Nt = int(compile_data["params"]["Nt"])
-    M  = Mt * P
-    K  = Kt * P
-    N  = Nt * P
+    with open(f"{args.name}/out.json", encoding='utf-8') as json_file:
+        compile_data = json.load(json_file)
+    P  = int(compile_data['params']['P'])
+    Mt = int(compile_data['params']['Mt'])
+    Kt = int(compile_data['params']['Kt'])
+    Nt = int(compile_data['params']['Nt'])
+    M = Mt * P
+    K = Kt * P
+    N = Nt * P
+
+print(f"SUMMA with 4-Color Overlapped Broadcasts (fp16)")
+print(f"  Grid: {P} x {P} PEs")
+print(f"  Tile sizes: Mt={Mt}, Kt={Kt}, Nt={Nt}")
+print(f"  Full matrices: A({M}x{K}) @ B({K}x{N}) = C({M}x{N})")
 
 io_dtype     = MemcpyDataType.MEMCPY_16BIT
 memcpy_order = MemcpyOrder.ROW_MAJOR
 
-np.random.seed(2025)
+np.random.seed(seed=7)
 A = np.random.rand(M, K).astype(np.float16)
 B = np.random.rand(K, N).astype(np.float16)
 
-# Cliff distribution — column-major local tiles (same layout as f32 original)
+# Cliff distribution — column-major local tiles
+# h2d: view f16 as uint16, zero-extend to uint32
 A1 = A.reshape(P, Mt, P, Kt)
 A2 = A1.transpose(0, 2, 3, 1)       # (P, P, Kt, Mt) col-major local
 A3 = A2.reshape(P, P, Mt * Kt)
@@ -80,6 +84,7 @@ B3 = B2.reshape(P, P, Kt * Nt)
 B_u32 = B3.ravel().view(np.uint16).astype(np.uint32)
 
 runner = SdkRuntime(args.name, cmaddr=args.cmaddr)
+
 sym_A           = runner.get_id("A")
 sym_B           = runner.get_id("B")
 sym_C           = runner.get_id("C")
@@ -89,10 +94,10 @@ sym_time_ref    = runner.get_id("time_ref")
 runner.load()
 runner.run()
 
-C_1d_u32 = None
+C3_1d_u32 = None
 
 try:
-    # ── Send input tiles (once; tiles stay on device across both passes) ──────
+    # Send input tiles (once; tiles stay on device across both passes)
     runner.memcpy_h2d(sym_A, A_u32, 0, 0, P, P, Mt * Kt,
                       streaming=False, data_type=io_dtype,
                       order=memcpy_order, nonblock=False)
@@ -104,18 +109,16 @@ try:
     total_warmup_times, total_repeat_times = 0, 1
     runner.launch("summa_host", np.int16(total_warmup_times), np.int16(total_repeat_times), nonblock=False)
 
-    # ── Correctness check d2h ─────────────────────────────────────────────────
-    C_1d_u32 = np.zeros(P * P * Mt * Nt, dtype=np.uint32)
-    runner.memcpy_d2h(C_1d_u32, sym_C, 0, 0, P, P, Mt * Nt,
+    C3_1d_u32 = np.zeros(P * P * Mt * Nt, dtype=np.uint32)
+    runner.memcpy_d2h(C3_1d_u32, sym_C, 0, 0, P, P, Mt * Nt,
                       streaming=False, data_type=io_dtype,
                       order=memcpy_order, nonblock=False)
 
-    # --- Pass 2: performance timing (skipped if --repeats 0) ---
+    # --- Pass 2: performance timing ---
     if args.repeats > 0:
         total_warmup_times, total_repeat_times = args.warmup, args.repeats
         runner.launch("summa_host", np.int16(total_warmup_times), np.int16(total_repeat_times), nonblock=False)
 
-        # ── Retrieve timestamps (span all timed runs; divide by total_repeat_times) ─
         time_memcpy_1d_f32 = np.zeros(P * P * 3, dtype=np.float32)
         runner.memcpy_d2h(time_memcpy_1d_f32, sym_time_memcpy, 0, 0, P, P, 3,
                           streaming=False, data_type=MemcpyDataType.MEMCPY_32BIT,
@@ -131,42 +134,23 @@ try:
 finally:
     runner.stop()
 
-# ── Correctness check ────────────────────────────────────────────────────────
-# Reconstruct global C from column-major tiles (inverse cliff distribution)
-C_fp16 = C_1d_u32.astype(np.uint16).view(np.float16)
+# ── Correctness check ─────────────────────────────────────────────────────────
+# d2h: truncate uint32 to uint16, view as float16
+C_fp16 = C3_1d_u32.astype(np.uint16).view(np.float16)
 C3 = C_fp16.reshape(P, P, Nt, Mt)
 C2 = C3.transpose(0, 3, 1, 2)   # (P, Mt, P, Nt)
-C_device = C2.reshape(M, N)
-C_ref = np.dot(A.astype(np.float32), B.astype(np.float32)).astype(np.float16)
+C  = C2.reshape(M, N)
 
-# Compare as fp32 to avoid fp16 arithmetic in the check itself.
-def is_error(a, b):
-    return (np.abs((a - b) / (a + b)) > 1e-3) & (np.abs(a - b) > 0.05) # relative and absolute error hold true
+# Reference: compute in f32, cast result to f16
+C_expected = np.dot(A.astype(np.float32), B.astype(np.float32)).astype(np.float16)
 
-a = C_device.astype(np.float32)
-b = C_ref.astype(np.float32)
-error_mask    = is_error(a, b)
-error_indices = np.argwhere(error_mask)
-num_errors    = len(error_indices)
+np.testing.assert_allclose(C_expected, C, rtol=0.5, atol=0)
+print("Correctness check PASSED")
 
-# we only output the 10 errors
-for idx in error_indices[:10]:
-    i, j = idx
-    print(f"Mismatch at [{i},{j}]: expected {b[i,j]:.4f}, got {a[i,j]:.4f}")
+if args.repeats <= 0:
+    exit(0)
 
-if num_errors == 0:
-    print("Correctness check PASSED")
-else:
-    print(f"Correctness check FAILED: {num_errors} / {M*N} ({100*num_errors/(M*N):.1f}%) elements mismatched")
-
-# fp16 can have large relative errors; use rtol=0.5 matching Cerebras convention (see fft-3d/run.py)
-try:
-    np.testing.assert_allclose(C_device, C_ref, rtol=0.5, atol=0)
-    print("Correctness check PASSED")
-except AssertionError as e:
-    print(f"Correctness check FAILED: {e}")
-
-# ── Unpack 48-bit cycle counts ───────────────────────────────────────────────
+# ── Unpack 48-bit cycle counts ────────────────────────────────────────────────
 time_start = np.zeros((P, P), dtype=np.int64)
 time_end   = np.zeros((P, P), dtype=np.int64)
 word = np.zeros(3, dtype=np.uint16)
@@ -185,7 +169,6 @@ for w in range(P):
         time_end[h, w] = make_u48(word)
 
 time_ref = np.zeros((P, P), dtype=np.int64)
-word = np.zeros(3, dtype=np.uint16)
 for w in range(P):
     for h in range(P):
         hex_t0 = f32_to_u32(time_ref_hwl[h, w, 0])

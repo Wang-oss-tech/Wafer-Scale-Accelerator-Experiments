@@ -20,7 +20,6 @@
 
 import argparse
 import json
-import struct
 import numpy as np
 
 from cerebras.sdk.runtime.sdkruntimepybind import SdkRuntime     # pylint: disable=no-name-in-module
@@ -28,8 +27,11 @@ from cerebras.sdk.runtime.sdkruntimepybind import MemcpyDataType # pylint: disab
 from cerebras.sdk.runtime.sdkruntimepybind import MemcpyOrder    # pylint: disable=no-name-in-module
 
 
-def float_to_hex(f):
-    return hex(struct.unpack("<I", struct.pack("<f", f))[0])
+def f32_to_u32(x):
+    """Read the raw bit pattern of a numpy float32 without any float conversion.
+    Using struct.pack round-trips through Python float (f64), which can canonicalize
+    NaN payloads and corrupt timestamp bits when the 32-bit pattern has exponent=0xFF."""
+    return int(np.float32(x).view(np.uint32))
 
 
 def make_u48(words):
@@ -169,9 +171,9 @@ time_end   = np.zeros((P, P), dtype=np.int64)
 word = np.zeros(3, dtype=np.uint16)
 for w in range(P):
     for h in range(P):
-        hex_t0 = int(float_to_hex(time_memcpy_hwl[h, w, 0]), base=16)
-        hex_t1 = int(float_to_hex(time_memcpy_hwl[h, w, 1]), base=16)
-        hex_t2 = int(float_to_hex(time_memcpy_hwl[h, w, 2]), base=16)
+        hex_t0 = f32_to_u32(time_memcpy_hwl[h, w, 0])
+        hex_t1 = f32_to_u32(time_memcpy_hwl[h, w, 1])
+        hex_t2 = f32_to_u32(time_memcpy_hwl[h, w, 2])
         word[0] = hex_t0 & 0x0000FFFF
         word[1] = (hex_t0 >> 16) & 0x0000FFFF
         word[2] = hex_t1 & 0x0000FFFF
@@ -185,8 +187,8 @@ time_ref = np.zeros((P, P), dtype=np.int64)
 word = np.zeros(3, dtype=np.uint16)
 for w in range(P):
     for h in range(P):
-        hex_t0 = int(float_to_hex(time_ref_hwl[h, w, 0]), base=16)
-        hex_t1 = int(float_to_hex(time_ref_hwl[h, w, 1]), base=16)
+        hex_t0 = f32_to_u32(time_ref_hwl[h, w, 0])
+        hex_t1 = f32_to_u32(time_ref_hwl[h, w, 1])
         word[0] = hex_t0 & 0x0000FFFF
         word[1] = (hex_t0 >> 16) & 0x0000FFFF
         word[2] = hex_t1 & 0x0000FFFF
