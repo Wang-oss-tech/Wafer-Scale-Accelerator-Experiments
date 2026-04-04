@@ -1,0 +1,518 @@
+========================================
+Grid: 180 x 180 PEs
+Tile sizes: Mt=12, Kt=12, Nt=12
+Full matrices: A(2160x2160) @ B(2160x2160) = C(2160x2160)
+========================================
+Start compiling: 2026-04-02 05:51:46
+Event 2026-04-02 05:58:23 +0000 UTC reason=InconsistentVersion wsjob=wsjob-mky64p5mfbvdetycnhdhyp message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-02 05:59:43,396 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-02 05:59:46
+Event 2026-04-02 05:59:48 +0000 UTC reason=InconsistentVersion wsjob=wsjob-ovbnfk5sjaudgajtgsmwav message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Host code execution response:  WARNING: The message system is being used before initialization.
+         Messages will still be printed, but with limited support.
+COUT034   Latest HIOLIB used
+COUT034  TCP connect to: 10.254.2.67:9000
+COUT034  No credentials found, disabling TLS
+COUT034  TLS is disabled
+COUT034  TLS disabled
+COUT034  Poll
+COUT034  TCP connected
+COUT034  Connection successful
+COUT034  Local addr: 10.125.9.73:51150
+COUT034  hio_ctl:HRQ_HANDSHAKE 59775 us
+COUT034  TCP connect to: 10.254.2.67:9000
+COUT034  TLS disabled
+COUT034  Poll
+COUT034  TCP connected
+COUT034  Connection successful
+COUT034  Local addr: 10.125.9.73:51156
+COUT034  hio_ctl:HRQ_HANDSHAKE 107465 us
+COUT034  hio_ctl:HRQ_GETFABRIC 263 us
+HAAP425 06:03:00 GMT  WARNING: hio_group_program is deprecated, use hio_flows_program
+COUT002 06:03:00 GMT  ERROR: LOGGER NOT INITIALIZED:
+COUT002 06:03:00 GMT  ERROR: 		wio_groups.json is deprecated, use wio_flows.json instead
+HWKA425 06:03:28 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 1 streamer 0 P:2 C:21 (10.254.3.54:23, 10.254.3.60:23, 10.254.3.66:23, 10.254.3.72:23) mode: RoCE
+HWKA425 06:03:28 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 0 streamer 0 P:0 C:48 (10.254.3.50:50, 10.254.3.56:50, 10.254.3.62:50, 10.254.3.68:50) mode: RoCE
+HWKA425 06:03:29 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 3 streamer 0 P:1 C:48 (10.254.3.52:50, 10.254.3.58:50, 10.254.3.64:50, 10.254.3.70:50) mode: RoCE
+HWKA425 06:03:29 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+SUMMA with 4-Color Overlapped Broadcasts (fp16)
+  Grid: 180 x 180 PEs
+  Tile sizes: Mt=12, Kt=12, Nt=12
+  Full matrices: A(2160x2160) @ B(2160x2160) = C(2160x2160)
+Correctness check PASSED
+
+Repeat count: 1
+P: 180, M: 2160, K: 2160, N: 2160
+Mean cycle count: 240621.9
+Max  cycle count: 242218.0
+Time: 0.2202 ms
+Opened egress stream flow 2 streamer 0 P:1 C:100 (10.254.3.52:102, 10.254.3.58:102, 10.254.3.64:102, 10.254.3.70:102) mode: RoCE
+
+Appliance/Real Hardware Mode on Cluster Completed
+
+========================================
+Grid: 360 x 360 PEs
+Tile sizes: Mt=6, Kt=6, Nt=6
+Full matrices: A(2160x2160) @ B(2160x2160) = C(2160x2160)
+========================================
+Start compiling: 2026-04-02 06:03:37
+Event 2026-04-02 06:24:12 +0000 UTC reason=InconsistentVersion wsjob=wsjob-wpj6vu79cug6qwm6nj6ojk message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-02 06:24:58,459 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-02 06:25:07
+Event 2026-04-02 06:25:09 +0000 UTC reason=InconsistentVersion wsjob=wsjob-aopr3withnmbwmfnd3ercm message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Traceback (most recent call last):
+  File "/home/william_wang_yale/R_2.6.0/csl-examples/experiments/gemm/summa_manual_multicasting_pipelined_doubleColor-fp16_optimized/appliance_launch.py", line 41, in <module>
+    response = launcher.run(f"cs_python run.py {run_args} --cmaddr %CMADDR%")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/cerebras/sdk/client/sdk_appliance_client.py", line 697, in run
+    response = self.stub().sdk_run_command(generate_command_params())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 1131, in __call__
+    return _end_unary_response_blocking(state, call, False, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 849, in _end_unary_response_blocking
+    raise _InactiveRpcError(state)
+grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+	status = StatusCode.UNAVAILABLE
+	details = "Socket closed"
+	debug_error_string = "UNKNOWN:Error received from peer ipv4:140.221.69.69:3128 {grpc_message:"Socket closed", grpc_status:14, created_time:"2026-04-02T06:40:38.071188078+00:00"}"
+>
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/william_wang_yale/R_2.6.0/csl-examples/experiments/gemm/summa_manual_multicasting_pipelined_doubleColor-fp16_optimized/appliance_launch.py", line 33, in <module>
+    with SdkLauncher(artifact_id, simulator=args.simulator, disable_version_check=True) as launcher:
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/cerebras/sdk/client/sdk_appliance_client.py", line 648, in __exit__
+    response = self.stub().sdk_shutdown(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 946, in __call__
+    return _end_unary_response_blocking(state, call, False, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 849, in _end_unary_response_blocking
+    raise _InactiveRpcError(state)
+grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+	status = StatusCode.UNAVAILABLE
+	details = "Socket closed"
+	debug_error_string = "UNKNOWN:Error received from peer ipv4:140.221.69.69:3128 {created_time:"2026-04-02T07:05:05.015418167+00:00", grpc_status:14, grpc_message:"Socket closed"}"
+>
+
+========================================
+Grid: 540 x 540 PEs
+Tile sizes: Mt=4, Kt=4, Nt=4
+Full matrices: A(2160x2160) @ B(2160x2160) = C(2160x2160)
+========================================
+Start compiling: 2026-04-02 07:05:05
+Event 2026-04-02 07:15:40 +0000 UTC reason=InconsistentVersion wsjob=wsjob-4bkypbptbfeaaazht4vdvd message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-02 07:16:56,096 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-02 07:17:15
+Event 2026-04-02 07:17:16 +0000 UTC reason=InconsistentVersion wsjob=wsjob-zkxayxnaahtkjkvrbpuqh4 message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Traceback (most recent call last):
+  File "/home/william_wang_yale/R_2.6.0/csl-examples/experiments/gemm/summa_manual_multicasting_pipelined_doubleColor-fp16_optimized/appliance_launch.py", line 41, in <module>
+    response = launcher.run(f"cs_python run.py {run_args} --cmaddr %CMADDR%")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/cerebras/sdk/client/sdk_appliance_client.py", line 697, in run
+    response = self.stub().sdk_run_command(generate_command_params())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 1131, in __call__
+    return _end_unary_response_blocking(state, call, False, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 849, in _end_unary_response_blocking
+    raise _InactiveRpcError(state)
+grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+	status = StatusCode.UNAVAILABLE
+	details = "Socket closed"
+	debug_error_string = "UNKNOWN:Error received from peer ipv4:140.221.69.69:3128 {grpc_message:"Socket closed", grpc_status:14, created_time:"2026-04-02T07:33:27.173984308+00:00"}"
+>
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/william_wang_yale/R_2.6.0/csl-examples/experiments/gemm/summa_manual_multicasting_pipelined_doubleColor-fp16_optimized/appliance_launch.py", line 33, in <module>
+    with SdkLauncher(artifact_id, simulator=args.simulator, disable_version_check=True) as launcher:
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/cerebras/sdk/client/sdk_appliance_client.py", line 648, in __exit__
+    response = self.stub().sdk_shutdown(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 946, in __call__
+    return _end_unary_response_blocking(state, call, False, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 849, in _end_unary_response_blocking
+    raise _InactiveRpcError(state)
+grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+	status = StatusCode.UNAVAILABLE
+	details = "Socket closed"
+	debug_error_string = "UNKNOWN:Error received from peer ipv4:140.221.69.69:3128 {grpc_message:"Socket closed", grpc_status:14, created_time:"2026-04-02T07:56:29.022796394+00:00"}"
+>
+
+========================================
+Grid: 720 x 720 PEs
+Tile sizes: Mt=3, Kt=3, Nt=3
+Full matrices: A(2160x2160) @ B(2160x2160) = C(2160x2160)
+========================================
+Start compiling: 2026-04-02 07:56:29
+Event 2026-04-02 08:07:11 +0000 UTC reason=InconsistentVersion wsjob=wsjob-u8czn9h6nnjza8tjok84fk message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-02 08:08:12,713 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-02 08:08:49
+Event 2026-04-02 08:08:50 +0000 UTC reason=InconsistentVersion wsjob=wsjob-yi9ofgtiinhkcsfdcnpga2 message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Traceback (most recent call last):
+  File "/home/william_wang_yale/R_2.6.0/csl-examples/experiments/gemm/summa_manual_multicasting_pipelined_doubleColor-fp16_optimized/appliance_launch.py", line 41, in <module>
+    response = launcher.run(f"cs_python run.py {run_args} --cmaddr %CMADDR%")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/cerebras/sdk/client/sdk_appliance_client.py", line 697, in run
+    response = self.stub().sdk_run_command(generate_command_params())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 1131, in __call__
+    return _end_unary_response_blocking(state, call, False, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 849, in _end_unary_response_blocking
+    raise _InactiveRpcError(state)
+grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+	status = StatusCode.UNAVAILABLE
+	details = "Socket closed"
+	debug_error_string = "UNKNOWN:Error received from peer ipv4:140.221.69.69:3128 {created_time:"2026-04-02T08:35:55.013835352+00:00", grpc_status:14, grpc_message:"Socket closed"}"
+>
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/william_wang_yale/R_2.6.0/csl-examples/experiments/gemm/summa_manual_multicasting_pipelined_doubleColor-fp16_optimized/appliance_launch.py", line 33, in <module>
+    with SdkLauncher(artifact_id, simulator=args.simulator, disable_version_check=True) as launcher:
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/cerebras/sdk/client/sdk_appliance_client.py", line 648, in __exit__
+    response = self.stub().sdk_shutdown(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 946, in __call__
+    return _end_unary_response_blocking(state, call, False, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 849, in _end_unary_response_blocking
+    raise _InactiveRpcError(state)
+grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+	status = StatusCode.UNAVAILABLE
+	details = "Socket closed"
+	debug_error_string = "UNKNOWN:Error received from peer ipv4:140.221.69.69:3128 {created_time:"2026-04-02T08:52:06.007670203+00:00", grpc_status:14, grpc_message:"Socket closed"}"
+>
+
+========================================
+Grid: 360 x 360 PEs
+Tile sizes: Mt=12, Kt=12, Nt=12
+Full matrices: A(4320x4320) @ B(4320x4320) = C(4320x4320)
+========================================
+Start compiling: 2026-04-02 08:52:06
+Event 2026-04-02 08:52:07 +0000 UTC reason=InconsistentVersion wsjob=wsjob-igwqxfdyfkfpemtlhnvrdj message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-02 08:52:47,079 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-02 08:52:56
+Event 2026-04-02 08:53:01 +0000 UTC reason=InconsistentVersion wsjob=wsjob-9rkxc7j524efgif9lnybfc message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Traceback (most recent call last):
+  File "/home/william_wang_yale/R_2.6.0/csl-examples/experiments/gemm/summa_manual_multicasting_pipelined_doubleColor-fp16_optimized/appliance_launch.py", line 41, in <module>
+    response = launcher.run(f"cs_python run.py {run_args} --cmaddr %CMADDR%")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/cerebras/sdk/client/sdk_appliance_client.py", line 697, in run
+    response = self.stub().sdk_run_command(generate_command_params())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 1131, in __call__
+    return _end_unary_response_blocking(state, call, False, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 849, in _end_unary_response_blocking
+    raise _InactiveRpcError(state)
+grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+	status = StatusCode.UNAVAILABLE
+	details = "Socket closed"
+	debug_error_string = "UNKNOWN:Error received from peer ipv4:140.221.69.69:3128 {created_time:"2026-04-02T09:12:08.043917636+00:00", grpc_status:14, grpc_message:"Socket closed"}"
+>
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/william_wang_yale/R_2.6.0/csl-examples/experiments/gemm/summa_manual_multicasting_pipelined_doubleColor-fp16_optimized/appliance_launch.py", line 33, in <module>
+    with SdkLauncher(artifact_id, simulator=args.simulator, disable_version_check=True) as launcher:
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/cerebras/sdk/client/sdk_appliance_client.py", line 648, in __exit__
+    response = self.stub().sdk_shutdown(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 946, in __call__
+    return _end_unary_response_blocking(state, call, False, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 849, in _end_unary_response_blocking
+    raise _InactiveRpcError(state)
+grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+	status = StatusCode.UNAVAILABLE
+	details = "Socket closed"
+	debug_error_string = "UNKNOWN:Error received from peer ipv4:140.221.69.69:3128 {grpc_message:"Socket closed", grpc_status:14, created_time:"2026-04-02T09:27:13.069566314+00:00"}"
+>
+
+========================================
+Grid: 540 x 540 PEs
+Tile sizes: Mt=8, Kt=8, Nt=8
+Full matrices: A(4320x4320) @ B(4320x4320) = C(4320x4320)
+========================================
+Start compiling: 2026-04-02 09:27:13
+Event 2026-04-02 09:27:13 +0000 UTC reason=InconsistentVersion wsjob=wsjob-mtjeed8akzaenbfmqpyj99 message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-02 09:28:04,461 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-02 09:28:23
+Event 2026-04-02 09:28:24 +0000 UTC reason=InconsistentVersion wsjob=wsjob-53p3nwzqtue8s9xm8yunx5 message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Traceback (most recent call last):
+  File "/home/william_wang_yale/R_2.6.0/csl-examples/experiments/gemm/summa_manual_multicasting_pipelined_doubleColor-fp16_optimized/appliance_launch.py", line 41, in <module>
+    response = launcher.run(f"cs_python run.py {run_args} --cmaddr %CMADDR%")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/cerebras/sdk/client/sdk_appliance_client.py", line 697, in run
+    response = self.stub().sdk_run_command(generate_command_params())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 1131, in __call__
+    return _end_unary_response_blocking(state, call, False, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 849, in _end_unary_response_blocking
+    raise _InactiveRpcError(state)
+grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+	status = StatusCode.UNAVAILABLE
+	details = "Socket closed"
+	debug_error_string = "UNKNOWN:Error received from peer ipv4:140.221.69.69:3128 {created_time:"2026-04-02T09:46:04.043996577+00:00", grpc_status:14, grpc_message:"Socket closed"}"
+>
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/william_wang_yale/R_2.6.0/csl-examples/experiments/gemm/summa_manual_multicasting_pipelined_doubleColor-fp16_optimized/appliance_launch.py", line 33, in <module>
+    with SdkLauncher(artifact_id, simulator=args.simulator, disable_version_check=True) as launcher:
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/cerebras/sdk/client/sdk_appliance_client.py", line 648, in __exit__
+    response = self.stub().sdk_shutdown(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 946, in __call__
+    return _end_unary_response_blocking(state, call, False, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 849, in _end_unary_response_blocking
+    raise _InactiveRpcError(state)
+grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+	status = StatusCode.UNAVAILABLE
+	details = "Socket closed"
+	debug_error_string = "UNKNOWN:Error received from peer ipv4:140.221.69.69:3128 {grpc_message:"Socket closed", grpc_status:14, created_time:"2026-04-02T10:01:07.110742493+00:00"}"
+>
+
+========================================
+Grid: 720 x 720 PEs
+Tile sizes: Mt=6, Kt=6, Nt=6
+Full matrices: A(4320x4320) @ B(4320x4320) = C(4320x4320)
+========================================
+Start compiling: 2026-04-02 10:01:07
+Event 2026-04-02 10:01:08 +0000 UTC reason=InconsistentVersion wsjob=wsjob-jerhxxchbxsn8pp5e8rful message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-02 10:02:10,522 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-02 10:02:47
+Event 2026-04-02 10:02:49 +0000 UTC reason=InconsistentVersion wsjob=wsjob-ke2rxvrn29xftarh4d4fq3 message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Traceback (most recent call last):
+  File "/home/william_wang_yale/R_2.6.0/csl-examples/experiments/gemm/summa_manual_multicasting_pipelined_doubleColor-fp16_optimized/appliance_launch.py", line 41, in <module>
+    response = launcher.run(f"cs_python run.py {run_args} --cmaddr %CMADDR%")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/cerebras/sdk/client/sdk_appliance_client.py", line 697, in run
+    response = self.stub().sdk_run_command(generate_command_params())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 1131, in __call__
+    return _end_unary_response_blocking(state, call, False, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 849, in _end_unary_response_blocking
+    raise _InactiveRpcError(state)
+grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+	status = StatusCode.UNAVAILABLE
+	details = "Socket closed"
+	debug_error_string = "UNKNOWN:Error received from peer ipv4:140.221.69.69:3128 {created_time:"2026-04-02T10:20:08.293503941+00:00", grpc_status:14, grpc_message:"Socket closed"}"
+>
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/william_wang_yale/R_2.6.0/csl-examples/experiments/gemm/summa_manual_multicasting_pipelined_doubleColor-fp16_optimized/appliance_launch.py", line 33, in <module>
+    with SdkLauncher(artifact_id, simulator=args.simulator, disable_version_check=True) as launcher:
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/cerebras/sdk/client/sdk_appliance_client.py", line 648, in __exit__
+    response = self.stub().sdk_shutdown(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 946, in __call__
+    return _end_unary_response_blocking(state, call, False, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 849, in _end_unary_response_blocking
+    raise _InactiveRpcError(state)
+grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+	status = StatusCode.UNAVAILABLE
+	details = "Socket closed"
+	debug_error_string = "UNKNOWN:Error received from peer ipv4:140.221.69.69:3128 {created_time:"2026-04-02T10:35:10.011413765+00:00", grpc_status:14, grpc_message:"Socket closed"}"
+>
+
+========================================
+Grid: 360 x 360 PEs
+Tile sizes: Mt=24, Kt=24, Nt=24
+Full matrices: A(8640x8640) @ B(8640x8640) = C(8640x8640)
+========================================
+Start compiling: 2026-04-02 10:35:10
+Event 2026-04-02 10:35:11 +0000 UTC reason=InconsistentVersion wsjob=wsjob-dikcitadu2hxikt4wvixfq message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-02 10:35:51,545 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-02 10:36:00
+Event 2026-04-02 10:36:09 +0000 UTC reason=InconsistentVersion wsjob=wsjob-ycok5h2vu6fcdkwuxlnp9g message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Traceback (most recent call last):
+  File "/home/william_wang_yale/R_2.6.0/csl-examples/experiments/gemm/summa_manual_multicasting_pipelined_doubleColor-fp16_optimized/appliance_launch.py", line 41, in <module>
+    response = launcher.run(f"cs_python run.py {run_args} --cmaddr %CMADDR%")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/cerebras/sdk/client/sdk_appliance_client.py", line 697, in run
+    response = self.stub().sdk_run_command(generate_command_params())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 1131, in __call__
+    return _end_unary_response_blocking(state, call, False, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 849, in _end_unary_response_blocking
+    raise _InactiveRpcError(state)
+grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+	status = StatusCode.UNAVAILABLE
+	details = "Socket closed"
+	debug_error_string = "UNKNOWN:Error received from peer ipv4:140.221.69.69:3128 {created_time:"2026-04-02T10:54:06.002065895+00:00", grpc_status:14, grpc_message:"Socket closed"}"
+>
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/william_wang_yale/R_2.6.0/csl-examples/experiments/gemm/summa_manual_multicasting_pipelined_doubleColor-fp16_optimized/appliance_launch.py", line 33, in <module>
+    with SdkLauncher(artifact_id, simulator=args.simulator, disable_version_check=True) as launcher:
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/cerebras/sdk/client/sdk_appliance_client.py", line 648, in __exit__
+    response = self.stub().sdk_shutdown(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 946, in __call__
+    return _end_unary_response_blocking(state, call, False, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 849, in _end_unary_response_blocking
+    raise _InactiveRpcError(state)
+grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+	status = StatusCode.UNAVAILABLE
+	details = "Socket closed"
+	debug_error_string = "UNKNOWN:Error received from peer ipv4:140.221.69.69:3128 {created_time:"2026-04-02T11:09:08.568203535+00:00", grpc_status:14, grpc_message:"Socket closed"}"
+>
+
+========================================
+Grid: 540 x 540 PEs
+Tile sizes: Mt=16, Kt=16, Nt=16
+Full matrices: A(8640x8640) @ B(8640x8640) = C(8640x8640)
+========================================
+Start compiling: 2026-04-02 11:09:08
+Event 2026-04-02 11:09:10 +0000 UTC reason=InconsistentVersion wsjob=wsjob-bqipgbdmd78ntbebsadrfm message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-02 11:09:58,773 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-02 11:10:19
+Event 2026-04-02 11:10:20 +0000 UTC reason=InconsistentVersion wsjob=wsjob-qvp83mqowv6brvrpnbpm4r message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Traceback (most recent call last):
+  File "/home/william_wang_yale/R_2.6.0/csl-examples/experiments/gemm/summa_manual_multicasting_pipelined_doubleColor-fp16_optimized/appliance_launch.py", line 41, in <module>
+    response = launcher.run(f"cs_python run.py {run_args} --cmaddr %CMADDR%")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/cerebras/sdk/client/sdk_appliance_client.py", line 697, in run
+    response = self.stub().sdk_run_command(generate_command_params())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 1131, in __call__
+    return _end_unary_response_blocking(state, call, False, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 849, in _end_unary_response_blocking
+    raise _InactiveRpcError(state)
+grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+	status = StatusCode.UNAVAILABLE
+	details = "Socket closed"
+	debug_error_string = "UNKNOWN:Error received from peer ipv4:140.221.69.69:3128 {created_time:"2026-04-02T11:28:08.083531386+00:00", grpc_status:14, grpc_message:"Socket closed"}"
+>
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/william_wang_yale/R_2.6.0/csl-examples/experiments/gemm/summa_manual_multicasting_pipelined_doubleColor-fp16_optimized/appliance_launch.py", line 33, in <module>
+    with SdkLauncher(artifact_id, simulator=args.simulator, disable_version_check=True) as launcher:
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/cerebras/sdk/client/sdk_appliance_client.py", line 648, in __exit__
+    response = self.stub().sdk_shutdown(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 946, in __call__
+    return _end_unary_response_blocking(state, call, False, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 849, in _end_unary_response_blocking
+    raise _InactiveRpcError(state)
+grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+	status = StatusCode.UNAVAILABLE
+	details = "Socket closed"
+	debug_error_string = "UNKNOWN:Error received from peer ipv4:140.221.69.69:3128 {created_time:"2026-04-02T11:43:10.010940079+00:00", grpc_status:14, grpc_message:"Socket closed"}"
+>
+
+========================================
+Grid: 720 x 720 PEs
+Tile sizes: Mt=12, Kt=12, Nt=12
+Full matrices: A(8640x8640) @ B(8640x8640) = C(8640x8640)
+========================================
+Start compiling: 2026-04-02 11:43:10
+Event 2026-04-02 11:43:11 +0000 UTC reason=InconsistentVersion wsjob=wsjob-9vfmskmquv3ky9netlppzn message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-02 11:44:13,637 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-02 11:44:50
+Event 2026-04-02 11:44:52 +0000 UTC reason=InconsistentVersion wsjob=wsjob-plbzchalbv2mdridzpzsei message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Traceback (most recent call last):
+  File "/home/william_wang_yale/R_2.6.0/csl-examples/experiments/gemm/summa_manual_multicasting_pipelined_doubleColor-fp16_optimized/appliance_launch.py", line 41, in <module>
+    response = launcher.run(f"cs_python run.py {run_args} --cmaddr %CMADDR%")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/cerebras/sdk/client/sdk_appliance_client.py", line 697, in run
+    response = self.stub().sdk_run_command(generate_command_params())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 1131, in __call__
+    return _end_unary_response_blocking(state, call, False, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 849, in _end_unary_response_blocking
+    raise _InactiveRpcError(state)
+grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+	status = StatusCode.UNAVAILABLE
+	details = "Socket closed"
+	debug_error_string = "UNKNOWN:Error received from peer ipv4:140.221.69.69:3128 {created_time:"2026-04-02T12:02:26.062933942+00:00", grpc_status:14, grpc_message:"Socket closed"}"
+>
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/william_wang_yale/R_2.6.0/csl-examples/experiments/gemm/summa_manual_multicasting_pipelined_doubleColor-fp16_optimized/appliance_launch.py", line 33, in <module>
+    with SdkLauncher(artifact_id, simulator=args.simulator, disable_version_check=True) as launcher:
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/cerebras/sdk/client/sdk_appliance_client.py", line 648, in __exit__
+    response = self.stub().sdk_shutdown(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 946, in __call__
+    return _end_unary_response_blocking(state, call, False, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 849, in _end_unary_response_blocking
+    raise _InactiveRpcError(state)
+grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+	status = StatusCode.UNAVAILABLE
+	details = "Socket closed"
+	debug_error_string = "UNKNOWN:Error received from peer ipv4:140.221.69.69:3128 {grpc_message:"Socket closed", grpc_status:14, created_time:"2026-04-02T12:18:07.292254557+00:00"}"
+>
+

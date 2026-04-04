@@ -20,7 +20,11 @@
       "Bash(tail:*)",
       "Bash(cs_readelf:*)",
       "Bash(sort -t= -k2 -n)",
-      "Bash(export:*)"
+      "Bash(export:*)",
+      "Bash(cp -r /home/william_wang_yale/R_2.6.0/csl-examples/experiments/gemm/summa_manual_multicasting_pipelined_doubleColor-fp16 /home/william_wang_yale/R_2.6.0/csl-examples/experiments/gemm/summa_manual_multicasting_pipelined_doubleColor-fp16_optimized)",
+      "Bash(python3 -c \"\nimport performance_model_fp16_optimized as m\n\nconfigs = [\n    \\(4,  14, 14, 14, 10651\\),\n    \\(4,  28, 28, 28, 47405\\),\n    \\(180, 12, 12, 12, 242220\\),\n]\n\nprint\\(f'{'Config':<30} {'Model':>10} {'Actual':>10} {'Error%':>8}'\\)\nprint\\('-'*62\\)\nfor P, Mt, Kt, Nt, actual in configs:\n    _, kernel, _ = m.total_cycles\\(P, Mt, Kt, Nt\\)\n    err = \\(kernel - actual\\) / actual * 100\n    print\\(f'P={P} Mt={Mt} Kt={Kt} Nt={Nt}   {kernel:>10} {actual:>10} {err:>+8.1f}%'\\)\n\")",
+      "Bash(python3 performance_model_fp16_optimized.py 2>&1)",
+      "Bash(ls -t /home/william_wang_yale/R_2.6.0/csl-examples/experiments/gemm/summa_manual_multicasting_pipelined_doubleColor-fp16_optimized/wsjob-*.json | head -3)"
     ]
   }
 }

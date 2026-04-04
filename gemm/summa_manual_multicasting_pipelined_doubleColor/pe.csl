@@ -807,18 +807,18 @@ fn configure_col_broadcast(k: u16, c: color) void {
 // ============================================================================
 
 fn start_broadcast_0() void {
-    prt.print_string("Starting broadcast 0 at location ");
-    prt.print_u16_decimal(px);
-    prt.print_string(",");
-    prt.print_u16_decimal(py);
-    prt.print_string("\n");
+    // prt.print_string("Starting broadcast 0 at location ");
+    // prt.print_u16_decimal(px);
+    // prt.print_string(",");
+    // prt.print_u16_decimal(py);
+    // prt.print_string("\n");
     configure_row_broadcast(0, a_even_color);
     configure_col_broadcast(0, b_even_color);
-    prt.print_string("Configured broadcast 0 at location ");
-    prt.print_u16_decimal(px);
-    prt.print_string(",");
-    prt.print_u16_decimal(py);
-    prt.print_string("\n");
+    // prt.print_string("Configured broadcast 0 at location ");
+    // prt.print_u16_decimal(px);
+    // prt.print_string(",");
+    // prt.print_u16_decimal(py);
+    // prt.print_string("\n");
 
 
     mem_A_recv = @set_dsd_base_addr(mem_A_recv, get_A_buffer(0));
@@ -842,13 +842,13 @@ fn start_broadcast_0() void {
 // ============================================================================
 
 fn start_broadcast_async(k: u16) void {
-    prt.print_string("Starting broadcast ");
-    prt.print_u16_decimal(k);
-    prt.print_string(" at location ");
-    prt.print_u16_decimal(px);
-    prt.print_string(",");
-    prt.print_u16_decimal(py);
-    prt.print_string("\n");
+    // prt.print_string("Starting broadcast ");
+    // prt.print_u16_decimal(k);
+    // prt.print_string(" at location ");
+    // prt.print_u16_decimal(px);
+    // prt.print_string(",");
+    // prt.print_u16_decimal(py);
+    // prt.print_string("\n");
     if (k % 2 == 0) {
         configure_row_broadcast(k, a_even_color);
         configure_col_broadcast(k, b_even_color);
@@ -856,13 +856,13 @@ fn start_broadcast_async(k: u16) void {
         configure_row_broadcast(k, a_odd_color);
         configure_col_broadcast(k, b_odd_color);
     }
-    prt.print_string("Configured broadcast ");
-    prt.print_u16_decimal(k);
-    prt.print_string(" at location ");
-    prt.print_u16_decimal(px);
-    prt.print_string(",");
-    prt.print_u16_decimal(py);
-    prt.print_string("\n");
+    // prt.print_string("Configured broadcast ");
+    // prt.print_u16_decimal(k);
+    // prt.print_string(" at location ");
+    // prt.print_u16_decimal(px);
+    // prt.print_string(",");
+    // prt.print_u16_decimal(py);
+    // prt.print_string("\n");
     mem_A_recv = @set_dsd_base_addr(mem_A_recv, get_A_buffer(k));
     mem_B_recv = @set_dsd_base_addr(mem_B_recv, get_B_buffer(k));
 
@@ -898,13 +898,13 @@ fn start_broadcast_async(k: u16) void {
 // ============================================================================
 
 fn do_gemm(k: u16) void {
-    prt.print_string("Starting GEMM ");
-    prt.print_u16_decimal(k);
-    prt.print_string(" location ");
-    prt.print_u16_decimal(px);
-    prt.print_string(",");
-    prt.print_u16_decimal(py);
-    prt.print_string("\n");
+    // prt.print_string("Starting GEMM ");
+    // prt.print_u16_decimal(k);
+    // prt.print_string(" location ");
+    // prt.print_u16_decimal(px);
+    // prt.print_string(",");
+    // prt.print_u16_decimal(py);
+    // prt.print_string("\n");
     const Ap = if (px == k) &A_tile else get_A_buffer(k);
     const Bp = if (py == k) &B_tile else get_B_buffer(k);
 
@@ -933,13 +933,13 @@ fn do_gemm(k: u16) void {
         }
         A_dsd = @increment_dsd_offset(A_dsd, Mt, f32);
     }
-    prt.print_string("Ending GEMM ");
-    prt.print_u16_decimal(k);
-    prt.print_string(" location ");
-    prt.print_u16_decimal(px);
-    prt.print_string(",");
-    prt.print_u16_decimal(py);
-    prt.print_string("\n");
+    // prt.print_string("Ending GEMM ");
+    // prt.print_u16_decimal(k);
+    // prt.print_string(" location ");
+    // prt.print_u16_decimal(px);
+    // prt.print_string(",");
+    // prt.print_u16_decimal(py);
+    // prt.print_string("\n");
 }
 // ============================================================================
 // First broadcast callbacks → kick off the pipeline
@@ -952,11 +952,11 @@ fn do_gemm(k: u16) void {
 // ============================================================================
 
 task run_pipeline() void {
-    prt.print_string("Broadcast 0 completed, Starting pipeline at location ");
-    prt.print_u16_decimal(px);
-    prt.print_string(",");
-    prt.print_u16_decimal(py);
-    prt.print_string("\n");
+    // prt.print_string("Broadcast 0 completed, Starting pipeline at location ");
+    // prt.print_u16_decimal(px);
+    // prt.print_string(",");
+    // prt.print_u16_decimal(py);
+    // prt.print_string("\n");
     var k: u16 = 1;
     while (k < P) : (k += 1) {
         // Start broadcast k on the alternate color pair (async)

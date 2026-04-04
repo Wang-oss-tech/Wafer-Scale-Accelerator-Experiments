@@ -46,7 +46,7 @@ def total_cycles(P, Mt, Kt, Nt):
 
 # Test with measured configuration
 if __name__ == "__main__":
-      P, Mt, Kt, Nt = 180, 12, 12, 12
+      P, Mt, Kt, Nt = 4, 14, 14, 14
       
       print(f"Configuration: P={P}, Mt={Mt}, Kt={Kt}, Nt={Nt}")
       print(f"H2D cycles: {h2d_memcpy(P, Mt, Kt, Nt)}")

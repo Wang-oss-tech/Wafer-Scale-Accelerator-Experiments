@@ -310,6 +310,35 @@
                 }
             },
             "coordinator_ip_port": "10.125.8.252:9000"
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-jhuqophkznduuuo5kjbtyt",
+            "workflow_id": "wflow-jzsrn2c3cbh4xb7xlcbo5dt7fq",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-jhuqophkznduuuo5kjbtyt",
+            "start_time": "2026-04-03T20:10:58Z",
+            "scheduled_time": "2026-04-03T20:11:18Z",
+            "software_versions": {
+                "appliance-client": "2.9.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse001-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            },
+            "coordinator_ip_port": "10.125.8.187:9000"
         }
     ],
     "execute_jobs": [
@@ -423,6 +452,25 @@
             },
             "system_versions": {
                 "cer-anl-wse002-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-azjcmn3lzsbdnjabuatut6",
+            "workflow_id": "wflow-7qqh2ltqrra6xaewjhzbyeyvey",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-azjcmn3lzsbdnjabuatut6",
+            "start_time": "2026-04-03T20:12:58Z",
+            "scheduled_time": "2026-04-03T20:14:08Z",
+            "software_versions": {
+                "appliance-client": "2.9.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy02": {
                     "execmode": "WEIGHT_STREAMING"
                 }
             }
