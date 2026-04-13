@@ -1,0 +1,360 @@
+========================================
+Grid: 120 x 120 PEs
+Tile sizes: Mt=36, Nt=36
+Full matrix: x(1x4320) * W(4320x4320)
+group_num=8, pe_num_group=15
+========================================
+Start compiling: 2026-04-12 19:31:39
+Event 2026-04-12 19:31:40 +0000 UTC reason=InconsistentVersion wsjob=wsjob-ihbddk2ruedrrpai2xnt4e message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-12 19:33:14,418 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-12 19:33:19
+Start running: 2026-04-12 19:33:20
+Event 2026-04-12 19:33:21 +0000 UTC reason=InconsistentVersion wsjob=wsjob-gbmhay49osvhzcn7nxrtea message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Running on simulator: False
+
+Repeat count: 100
+P: 120, M: 4320, N: 4320
+Mean cycle count: 1026.01
+Max Cycle count: 1028.39
+Time: 0.0009349000000000001 ms
+
+========================================
+Grid: 240 x 240 PEs
+Tile sizes: Mt=18, Nt=18
+Full matrix: x(1x4320) * W(4320x4320)
+group_num=16, pe_num_group=15
+========================================
+Start compiling: 2026-04-12 19:37:30
+Event 2026-04-12 19:37:31 +0000 UTC reason=InconsistentVersion wsjob=wsjob-zqhjy5ddecu4heqynechlg message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-12 19:40:46,154 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-12 19:40:50
+Start running: 2026-04-12 19:40:51
+Event 2026-04-12 19:40:52 +0000 UTC reason=InconsistentVersion wsjob=wsjob-543n89u544axhcdbgopvwb message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Running on simulator: False
+
+Repeat count: 100
+P: 240, M: 4320, N: 4320
+Mean cycle count: 988.7536666666667
+Max Cycle count: 993.75
+Time: 0.0009034090909090909 ms
+
+========================================
+Grid: 360 x 360 PEs
+Tile sizes: Mt=12, Nt=12
+Full matrix: x(1x4320) * W(4320x4320)
+group_num=24, pe_num_group=15
+========================================
+Start compiling: 2026-04-12 19:43:12
+Event 2026-04-12 19:43:13 +0000 UTC reason=InconsistentVersion wsjob=wsjob-mmbz5rxthjojpwhwy4zwor message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-12 19:48:39,602 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-12 19:48:52
+Start running: 2026-04-12 19:48:52
+Event 2026-04-12 19:48:54 +0000 UTC reason=InconsistentVersion wsjob=wsjob-drrfe9wiohybeznc8whafr message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Running on simulator: False
+
+Repeat count: 100
+P: 360, M: 4320, N: 4320
+Mean cycle count: 1190.2488888888888
+Max Cycle count: 1197.41
+Time: 0.0010885545454545455 ms
+
+========================================
+Grid: 480 x 480 PEs
+Tile sizes: Mt=9, Nt=9
+Full matrix: x(1x4320) * W(4320x4320)
+group_num=32, pe_num_group=15
+========================================
+Start compiling: 2026-04-12 19:51:14
+Event 2026-04-12 19:51:15 +0000 UTC reason=InconsistentVersion wsjob=wsjob-kfnr4na8kwvqmuhpmakva3 message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-12 20:00:34,131 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-12 20:00:54
+Start running: 2026-04-12 20:00:55
+Event 2026-04-12 20:00:56 +0000 UTC reason=InconsistentVersion wsjob=wsjob-nlzbmgfx6tayataaxmyv29 message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Running on simulator: False
+
+Repeat count: 100
+P: 480, M: 4320, N: 4320
+Mean cycle count: 1455.1975
+Max Cycle count: 1465.21
+Time: 0.001332009090909091 ms
+
+========================================
+Grid: 600 x 600 PEs
+Tile sizes: Mt=8, Nt=8
+Full matrix: x(1x4800) * W(4800x4800)
+group_num=40, pe_num_group=15
+========================================
+Start compiling: 2026-04-12 20:03:27
+Event 2026-04-12 20:03:28 +0000 UTC reason=InconsistentVersion wsjob=wsjob-4hd2wtbftjadjravzwyiq7 message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-12 20:18:53,915 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-12 20:19:18
+Start running: 2026-04-12 20:19:18
+Event 2026-04-12 20:19:19 +0000 UTC reason=InconsistentVersion wsjob=wsjob-7y7bmrxpdwpakjzqebkjft message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Running on simulator: False
+
+Repeat count: 100
+P: 600, M: 4800, N: 4800
+Mean cycle count: 1738.37
+Max Cycle count: 1752.71
+Time: 0.0015933727272727273 ms
+
+========================================
+Grid: 120 x 120 PEs
+Tile sizes: Mt=72, Nt=72
+Full matrix: x(1x8640) * W(8640x8640)
+group_num=8, pe_num_group=15
+========================================
+Start compiling: 2026-04-12 20:22:32
+Event 2026-04-12 20:22:33 +0000 UTC reason=InconsistentVersion wsjob=wsjob-2tr2mke7nafximm5py238r message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-12 20:23:57,831 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-12 20:24:02
+Start running: 2026-04-12 20:24:03
+Event 2026-04-12 20:24:04 +0000 UTC reason=InconsistentVersion wsjob=wsjob-akc4rssn6phcmvyczfqwbx message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Running on simulator: False
+
+Repeat count: 100
+P: 120, M: 8640, N: 8640
+Mean cycle count: 2333.01
+Max Cycle count: 2335.39
+Time: 0.002123081818181818 ms
+
+========================================
+Grid: 240 x 240 PEs
+Tile sizes: Mt=36, Nt=36
+Full matrix: x(1x8640) * W(8640x8640)
+group_num=16, pe_num_group=15
+========================================
+Start compiling: 2026-04-12 20:26:24
+Event 2026-04-12 20:26:25 +0000 UTC reason=InconsistentVersion wsjob=wsjob-nagmjk5ow2ughfvxjnecne message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-12 20:29:41,546 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-12 20:29:44
+Start running: 2026-04-12 20:29:45
+Event 2026-04-12 20:29:46 +0000 UTC reason=InconsistentVersion wsjob=wsjob-drarcmesnpswi3uigghzva message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Running on simulator: False
+
+Repeat count: 100
+P: 240, M: 8640, N: 8640
+Mean cycle count: 1340.2391666666665
+Max Cycle count: 1345.23
+Time: 0.0012229363636363636 ms
+
+========================================
+Grid: 360 x 360 PEs
+Tile sizes: Mt=24, Nt=24
+Full matrix: x(1x8640) * W(8640x8640)
+group_num=24, pe_num_group=15
+========================================
+Start compiling: 2026-04-12 20:32:06
+Event 2026-04-12 20:32:07 +0000 UTC reason=InconsistentVersion wsjob=wsjob-77ssespdfqzxe929amesdc message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-12 20:37:46,825 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-12 20:37:56
+Start running: 2026-04-12 20:37:57
+Event 2026-04-12 20:37:58 +0000 UTC reason=InconsistentVersion wsjob=wsjob-mnpmgzetwgvtekmuh7vddf message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Running on simulator: False
+
+Repeat count: 100
+P: 360, M: 8640, N: 8640
+Mean cycle count: 1356.6648333333333
+Max Cycle count: 1363.7
+Time: 0.0012397272727272728 ms
+
+========================================
+Grid: 480 x 480 PEs
+Tile sizes: Mt=18, Nt=18
+Full matrix: x(1x8640) * W(8640x8640)
+group_num=32, pe_num_group=15
+========================================
+Start compiling: 2026-04-12 20:40:08
+Event 2026-04-12 20:40:09 +0000 UTC reason=InconsistentVersion wsjob=wsjob-gcnby4cfkmdqvenahapn62 message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-12 20:49:46,655 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-12 20:50:09
+Start running: 2026-04-12 20:50:09
+Event 2026-04-12 20:50:10 +0000 UTC reason=InconsistentVersion wsjob=wsjob-5ydwmdhhrsvsgmgmkm4pmq message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Running on simulator: False
+
+Repeat count: 100
+P: 480, M: 8640, N: 8640
+Mean cycle count: 1548.7119583333333
+Max Cycle count: 1559.11
+Time: 0.0014173727272727271 ms
+
+========================================
+Grid: 600 x 600 PEs
+Tile sizes: Mt=12, Nt=12
+Full matrix: x(1x7200) * W(7200x7200)
+group_num=40, pe_num_group=15
+========================================
+Start compiling: 2026-04-12 20:52:32
+Event 2026-04-12 20:52:33 +0000 UTC reason=InconsistentVersion wsjob=wsjob-37g7fhbkxmajymlpaagt6k message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-12 21:07:45,858 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-12 21:08:12
+Start running: 2026-04-12 21:08:13
+Event 2026-04-12 21:08:14 +0000 UTC reason=InconsistentVersion wsjob=wsjob-dx6op6mvmzdawj8jrj2wat message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Running on simulator: False
+
+Repeat count: 100
+P: 600, M: 7200, N: 7200
+Mean cycle count: 1777.4685164444445
+Max Cycle count: 1792.71
+Time: 0.0016297363636363638 ms
+
+========================================
+Grid: 120 x 120 PEs
+Tile sizes: Mt=120, Nt=120
+Full matrix: x(1x14400) * W(14400x14400)
+group_num=8, pe_num_group=15
+========================================
+Start compiling: 2026-04-12 21:11:27
+Event 2026-04-12 21:11:28 +0000 UTC reason=InconsistentVersion wsjob=wsjob-57w78bfsanqyvhjthnjsxl message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-12 21:13:03,637 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-12 21:13:07
+Start running: 2026-04-12 21:13:09
+Event 2026-04-12 21:13:10 +0000 UTC reason=InconsistentVersion wsjob=wsjob-sje7vpkbwrfs2tz5ekxh3x message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Running on simulator: False
+
+Repeat count: 100
+P: 120, M: 14400, N: 14400
+Mean cycle count: 5305.01
+Max Cycle count: 5307.39
+Time: 0.0048249 ms
+
+========================================
+Grid: 240 x 240 PEs
+Tile sizes: Mt=60, Nt=60
+Full matrix: x(1x14400) * W(14400x14400)
+group_num=16, pe_num_group=15
+========================================
+Start compiling: 2026-04-12 21:15:20
+Event 2026-04-12 21:15:21 +0000 UTC reason=InconsistentVersion wsjob=wsjob-alodcwdn49udqjadgfte5s message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-12 21:18:34,478 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-12 21:18:40
+Start running: 2026-04-12 21:18:42
+Event 2026-04-12 21:18:43 +0000 UTC reason=InconsistentVersion wsjob=wsjob-bfxp2sm4yycddynh6ujw6a message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Running on simulator: False
+
+Repeat count: 100
+P: 240, M: 14400, N: 14400
+Mean cycle count: 2125.7779166666664
+Max Cycle count: 2131.03
+Time: 0.0019373 ms
+
+========================================
+Grid: 360 x 360 PEs
+Tile sizes: Mt=40, Nt=40
+Full matrix: x(1x14400) * W(14400x14400)
+group_num=24, pe_num_group=15
+========================================
+Start compiling: 2026-04-12 21:21:03
+Event 2026-04-12 21:21:04 +0000 UTC reason=InconsistentVersion wsjob=wsjob-hkkjtejauxhxfiyw4wzy2c message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-12 21:26:48,133 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-12 21:27:03
+Start running: 2026-04-12 21:27:05
+Event 2026-04-12 21:27:06 +0000 UTC reason=InconsistentVersion wsjob=wsjob-jkb7grcpvf2ajkrukzenbw message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Running on simulator: False
+
+Repeat count: 100
+P: 360, M: 14400, N: 14400
+Mean cycle count: 1728.0377777777778
+Max Cycle count: 1735.19
+Time: 0.0015774454545454547 ms
+
+========================================
+Grid: 480 x 480 PEs
+Tile sizes: Mt=30, Nt=30
+Full matrix: x(1x14400) * W(14400x14400)
+group_num=32, pe_num_group=15
+========================================
+Start compiling: 2026-04-12 21:29:36
+Event 2026-04-12 21:29:38 +0000 UTC reason=InconsistentVersion wsjob=wsjob-frr7ucaaxnwlrshms2heso message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-12 21:39:21,568 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-12 21:39:37
+Start running: 2026-04-12 21:39:38
+Event 2026-04-12 21:39:40 +0000 UTC reason=InconsistentVersion wsjob=wsjob-hupxvxgdgjhrnhhqc6ocqx message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Running on simulator: False
+
+Repeat count: 100
+P: 480, M: 14400, N: 14400
+Mean cycle count: 1756.2284375
+Max Cycle count: 1767.44
+Time: 0.0016067636363636365 ms
+
+========================================
+Grid: 600 x 600 PEs
+Tile sizes: Mt=24, Nt=24
+Full matrix: x(1x14400) * W(14400x14400)
+group_num=40, pe_num_group=15
+========================================
+Start compiling: 2026-04-12 21:42:41
+Event 2026-04-12 21:42:42 +0000 UTC reason=InconsistentVersion wsjob=wsjob-kvxmtgzuzgi88cqmkp96xh message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-12 21:57:31,876 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-12 21:58:01
+Start running: 2026-04-12 21:58:03
+Event 2026-04-12 21:58:04 +0000 UTC reason=InconsistentVersion wsjob=wsjob-ghx8zhqotav57gusfpex2f message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Running on simulator: False
+
+Repeat count: 100
+P: 600, M: 14400, N: 14400
+Mean cycle count: 1951.9454166666665
+Max Cycle count: 1964.19
+Time: 0.0017856272727272728 ms
+

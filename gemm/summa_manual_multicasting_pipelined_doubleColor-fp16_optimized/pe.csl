@@ -8,13 +8,15 @@
 //   - @increment_dsd_offset reduced from (Nt+1) per K step to 2 per K step
 //   - run.py B distribution uses transpose(0,2,1,3) for row-major local tiles
 //
-// Flow:
-//   broadcast(0) on even colors [wait for callbacks]
-//   for k = 1..P-1:
-//     configure + start broadcast(k) on color pair for step k  (async)
-//     do_gemm(k-1) on previous step's buffer                   (CE)
-//   do_gemm(P-1)
-//   done
+// Flow (callback-driven AND-gate pipeline):
+//   start_broadcast_0() → A fires PIPELINE_A_DONE_ID, B fires PIPELINE_B_DONE_ID
+//   pipeline_a_done → @activate(COMPUTE_DONE_ID)
+//   pipeline_b_done → @unblock(COMPUTE_DONE_ID)
+//   pipeline_compute fires only when BOTH signals arrive:
+//     1. start_broadcast_pipeline(step+1)  ← overlap: next broadcast starts
+//     2. do_gemm(step)                     ← safe: broadcast step already done
+//     3. step += 1; @block(COMPUTE_DONE_ID)
+//   repeat until step == P, then finish
 
 param memcpy_params: comptime_struct;
 param P: u16;
@@ -28,10 +30,12 @@ param b_even_color: color;
 param b_odd_color: color;
 
 param EXIT_TASK_ID: local_task_id;
-param COMPUTE_DONE_ID: local_task_id;
+param COMPUTE_DONE_ID: local_task_id;   // pipeline_compute (AND-gate, starts blocked)
 
-// Local task used to restart the pipeline between runs
-const RESTART_ID: local_task_id = @get_local_task_id(12);
+// AND-gate signal tasks and restart
+const PIPELINE_A_DONE_ID: local_task_id = @get_local_task_id(12);  // A recv done → @activate
+const PIPELINE_B_DONE_ID: local_task_id = @get_local_task_id(13);  // B recv done → @unblock
+const RESTART_ID:          local_task_id = @get_local_task_id(14);  // between-run restart
 
 const sys_mod    = @import_module("<memcpy/memcpy>", memcpy_params);
 const layout_mod = @import_module("<layout>");
@@ -114,6 +118,7 @@ var total_warmup_times: i16 = 0;
 var total_repeat_times: i16 = 1;
 var run_count: i16 = 0;
 var summa_host_mode: bool = false;
+var pipeline_step: u16 = 0;
 
 // ============================================================================
 // Buffer Selection
@@ -275,55 +280,51 @@ fn start_broadcast_0() void {
     mem_B_recv = @set_dsd_base_addr(mem_B_recv, @ptrcast([*]u32, get_B_buffer(0)));
 
     if (px == 0) {
-        @fmovs(fab_a_even_out, mem_A_tile, .{ .async = true });
+        @fmovs(fab_a_even_out, mem_A_tile, .{ .async = true, .activate = PIPELINE_A_DONE_ID });
     } else {
-        @fmovs(mem_A_recv, fab_a_even_in, .{ .async = true });
+        @fmovs(mem_A_recv, fab_a_even_in, .{ .async = true, .activate = PIPELINE_A_DONE_ID });
     }
 
     if (py == 0) {
-        @fmovs(fab_b_even_out, mem_B_tile, .{ .async = true, .activate = COMPUTE_DONE_ID });
+        @fmovs(fab_b_even_out, mem_B_tile, .{ .async = true, .activate = PIPELINE_B_DONE_ID });
     } else {
-        @fmovs(mem_B_recv, fab_b_even_in, .{ .async = true, .activate = COMPUTE_DONE_ID });
+        @fmovs(mem_B_recv, fab_b_even_in, .{ .async = true, .activate = PIPELINE_B_DONE_ID });
     }
 }
 
 // ============================================================================
-// Broadcast k (k >= 1) — alternates even/odd colors, no callbacks
+// Broadcast k (k >= 1) — alternates even/odd colors, callbacks fire AND-gate
 // ============================================================================
 
-fn start_broadcast_async(k: u16) void {
-    if (k % 2 == 0) {
-        configure_row_broadcast(k, a_even_color);
-        configure_col_broadcast(k, b_even_color);
-    } else {
-        configure_row_broadcast(k, a_odd_color);
-        configure_col_broadcast(k, b_odd_color);
-    }
-
+fn start_broadcast_pipeline(k: u16) void {
     mem_A_recv = @set_dsd_base_addr(mem_A_recv, @ptrcast([*]u32, get_A_buffer(k)));
     mem_B_recv = @set_dsd_base_addr(mem_B_recv, @ptrcast([*]u32, get_B_buffer(k)));
 
     if (k % 2 == 0) {
+        configure_row_broadcast(k, a_even_color);
+        configure_col_broadcast(k, b_even_color);
         if (px == k) {
-            @fmovs(fab_a_even_out, mem_A_tile, .{ .async = true });
+            @fmovs(fab_a_even_out, mem_A_tile, .{ .async = true, .activate = PIPELINE_A_DONE_ID });
         } else {
-            @fmovs(mem_A_recv, fab_a_even_in, .{ .async = true });
+            @fmovs(mem_A_recv, fab_a_even_in, .{ .async = true, .activate = PIPELINE_A_DONE_ID });
         }
         if (py == k) {
-            @fmovs(fab_b_even_out, mem_B_tile, .{ .async = true });
+            @fmovs(fab_b_even_out, mem_B_tile, .{ .async = true, .activate = PIPELINE_B_DONE_ID });
         } else {
-            @fmovs(mem_B_recv, fab_b_even_in, .{ .async = true });
+            @fmovs(mem_B_recv, fab_b_even_in, .{ .async = true, .activate = PIPELINE_B_DONE_ID });
         }
     } else {
+        configure_row_broadcast(k, a_odd_color);
+        configure_col_broadcast(k, b_odd_color);
         if (px == k) {
-            @fmovs(fab_a_odd_out, mem_A_tile, .{ .async = true });
+            @fmovs(fab_a_odd_out, mem_A_tile, .{ .async = true, .activate = PIPELINE_A_DONE_ID });
         } else {
-            @fmovs(mem_A_recv, fab_a_odd_in, .{ .async = true });
+            @fmovs(mem_A_recv, fab_a_odd_in, .{ .async = true, .activate = PIPELINE_A_DONE_ID });
         }
         if (py == k) {
-            @fmovs(fab_b_odd_out, mem_B_tile, .{ .async = true });
+            @fmovs(fab_b_odd_out, mem_B_tile, .{ .async = true, .activate = PIPELINE_B_DONE_ID });
         } else {
-            @fmovs(mem_B_recv, fab_b_odd_in, .{ .async = true });
+            @fmovs(mem_B_recv, fab_b_odd_in, .{ .async = true, .activate = PIPELINE_B_DONE_ID });
         }
     }
 }
@@ -369,26 +370,35 @@ fn do_gemm(k: u16) void {
 }
 
 // ============================================================================
-// Pipeline — runs after broadcast 0 completes (COMPUTE_DONE_ID callback)
+// Pipeline — callback-driven AND-gate (pipeline_compute = COMPUTE_DONE_ID)
+//
+// Both pipeline_a_done AND pipeline_b_done must fire before pipeline_compute
+// runs, guaranteeing broadcast data is fully received before do_gemm reads it.
 // ============================================================================
 
-task run_pipeline() void {
-    var k: u16 = 1;
-    while (k < P) : (k += 1) {
-        start_broadcast_async(k);
-        do_gemm(k - 1);
-    }
-    do_gemm(P - 1);
+task pipeline_a_done() void { @activate(COMPUTE_DONE_ID); }
+task pipeline_b_done() void { @unblock(COMPUTE_DONE_ID); }
 
-    if (!summa_host_mode) {
-        timestamp.get_timestamp(&tscEndBuffer);
-        timestamp.disable_tsc();
-        f_reference_timestamps();
-        f_memcpy_timestamps();
-        sys_mod.unblock_cmd_stream();
-    } else {
-        summa_entry();
+task pipeline_compute() void {
+    if (pipeline_step < P - 1) {
+        start_broadcast_pipeline(pipeline_step + 1);  // start next for overlap
     }
+    do_gemm(pipeline_step);
+    pipeline_step += 1;
+    @block(COMPUTE_DONE_ID);  // re-arm for next iteration
+
+    if (pipeline_step == P) {
+        if (!summa_host_mode) {
+            timestamp.get_timestamp(&tscEndBuffer);
+            timestamp.disable_tsc();
+            f_reference_timestamps();
+            f_memcpy_timestamps();
+            sys_mod.unblock_cmd_stream();
+        } else {
+            summa_entry();
+        }
+    }
+    // else: blocked, waiting for next broadcast's AND-gate signals
 }
 
 // ============================================================================
@@ -435,6 +445,7 @@ fn reset() void {
 
 task restart_task() void {
     for (@range(i16, Mt * Nt)) |i| { C_tile[@as(u16, i)] = 0.0; }
+    pipeline_step = 0;
     start_broadcast_0();
 }
 
@@ -466,6 +477,7 @@ fn summa_host(total_warmup_times_: i16, total_repeat_times_: i16) void {
     timestamp.enable_tsc();
     timestamp.get_timestamp(&tscRefBuffer);
 
+    pipeline_step = 0;
     summa_entry();
 }
 
@@ -479,6 +491,7 @@ fn main() void {
     timestamp.enable_tsc();
     timestamp.get_timestamp(&tscRefBuffer);
     timestamp.get_timestamp(&tscStartBuffer);
+    pipeline_step = 0;
     start_broadcast_0();
 }
 
@@ -511,9 +524,12 @@ comptime {
         @block(b_odd_iq);
     }
 
-    @bind_local_task(run_pipeline,  COMPUTE_DONE_ID);
-    @bind_local_task(exit_task,     EXIT_TASK_ID);
-    @bind_local_task(restart_task,  RESTART_ID);
+    @bind_local_task(pipeline_compute, COMPUTE_DONE_ID);     // AND-gate: starts blocked
+    @bind_local_task(pipeline_a_done,  PIPELINE_A_DONE_ID); // A recv done → @activate
+    @bind_local_task(pipeline_b_done,  PIPELINE_B_DONE_ID); // B recv done → @unblock
+    @bind_local_task(exit_task,        EXIT_TASK_ID);
+    @bind_local_task(restart_task,     RESTART_ID);
+    @block(COMPUTE_DONE_ID);  // pipeline_compute starts blocked (needs both A and B)
 
     @export_symbol(ptr_A, "A");
     @export_symbol(ptr_B, "B");

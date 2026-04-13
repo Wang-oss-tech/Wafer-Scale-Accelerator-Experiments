@@ -1,0 +1,186 @@
+// Copyright 2025 Cerebras Systems.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+param memcpy_params: comptime_struct;
+param c2d_params: comptime_struct;
+
+// Size of local tiles:
+//   X_tile: length Mt
+//   W_tile: Mt x Nt
+//   res_tile: length Nt
+param Mt: u16;
+param Nt: u16;
+
+// Task IDs
+const EXIT:               local_task_id = @get_local_task_id(9);
+const compute_task_id:    local_task_id = @get_local_task_id(10);
+const broadcast_task_id:  local_task_id = @get_local_task_id(11);
+const finalize_task_id:   local_task_id = @get_local_task_id(12);
+
+const sys_mod   = @import_module("<memcpy/memcpy>", memcpy_params);
+const timestamp = @import_module("<time>");
+
+// We keep the collectives_2d wiring and use y-direction reduce+broadcast
+// to model the pipeline-allreduce layout with meshgemv-compatible I/O.
+const mpi_x = @import_module("<collectives_2d/pe>", .{ .dim_params = c2d_params.x });
+const mpi_y = @import_module("<collectives_2d/pe>", .{ .dim_params = c2d_params.y });
+
+const Pw = @get_rectangle().width;
+const Ph = @get_rectangle().height;
+
+var X_tile = @zeros([Mt]f16);
+var ptr_X: [*]f16 = &X_tile;
+const dsd_X_tile = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt} -> X_tile[i] });
+
+var W_tile = @zeros([Mt * Nt]f16);
+var ptr_W: [*]f16 = &W_tile;
+const dsd_W_tile = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Nt} -> W_tile[i] });
+
+var res_tile = @zeros([Nt]f16);
+var ptr_res: [*]f16 = &res_tile;
+const dsd_res_tile = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Nt} -> res_tile[i] });
+
+// collectives_2d exposes f32 add-reduce, so reduce/broadcast through f32.
+var local_res_f32 = @zeros([Nt]f32);
+var allreduce_buf = @zeros([Nt]f32);
+
+const res_dest_dsr = @get_dsr(dsr_dest, 1);
+const res_src0_dsr = @get_dsr(dsr_src0, 1);
+const W_src1_dsr   = @get_dsr(dsr_src1, 1);
+
+var px: u16 = 0;
+var py: u16 = 0;
+
+// Timing buffers (48-bit TSC packed into f32 for memcpy transfer)
+var tscStartBuffer = @zeros([timestamp.tsc_size_words]u16);
+var tscEndBuffer   = @zeros([timestamp.tsc_size_words]u16);
+var tscRefBuffer   = @zeros([timestamp.tsc_size_words]u16);
+var time_buf_f32   = @zeros([3]f32);
+var ptr_time_memcpy: [*]f32 = &time_buf_f32;
+var time_ref_f32   = @zeros([2]f32);
+var ptr_time_ref:   [*]f32 = &time_ref_f32;
+
+// Called by @map for each X_tile[i]: res_tile[:] += X_tile[i] * W_tile[i, :]
+fn gemv_step(xi: f16) void {
+  @fmach(res_dest_dsr, res_src0_dsr, W_src1_dsr, xi);
+}
+
+var total_repeat_times: i16 = 1;
+var total_warmup_times: i16 = 0;
+var repeat_times: i16 = 0;
+
+fn init_task() void {
+  timestamp.enable_tsc();
+  mpi_x.init();
+  mpi_y.init();
+  px = mpi_x.pe_id;
+  py = mpi_y.pe_id;
+  sys_mod.unblock_cmd_stream();
+}
+
+fn pipeline_allreduce_host(total_warmup_times_: i16, total_repeat_times_: i16) void {
+  total_repeat_times = total_repeat_times_;
+  total_warmup_times = total_warmup_times_;
+  repeat_times = 0;
+  pipeline_allreduce_entry();
+}
+
+fn pipeline_allreduce_entry() void {
+  if (repeat_times == total_repeat_times + total_warmup_times) {
+    @activate(EXIT);
+  } else {
+    if (repeat_times == total_warmup_times) {
+      timestamp.get_timestamp(&tscRefBuffer);
+      timestamp.get_timestamp(&tscStartBuffer);
+    }
+    repeat_times += 1;
+    @activate(compute_task_id);
+  }
+}
+
+task compute() void {
+  @fmovh(dsd_res_tile, 0.0);
+
+  @load_to_dsr(res_dest_dsr, dsd_res_tile, .{ .save_address = false });
+  @load_to_dsr(res_src0_dsr, dsd_res_tile, .{ .save_address = false });
+  @load_to_dsr(W_src1_dsr, dsd_W_tile, .{ .save_address = true });
+  @map(gemv_step, dsd_X_tile);
+
+  for (@range(u16, Nt)) |i| {
+    local_res_f32[i] = @as(f32, res_tile[i]);
+  }
+
+  // Pipeline allreduce = reduce partial results to one y-root, then broadcast
+  // the completed output block back down the same PE column.
+  mpi_y.reduce_fadds(Ph - 1, @ptrcast([*]f32, &local_res_f32), @ptrcast([*]f32, &allreduce_buf),
+                     Nt, broadcast_task_id);
+}
+
+task broadcast_result() void {
+  mpi_y.broadcast(Ph - 1, @ptrcast([*]u32, &allreduce_buf), Nt, finalize_task_id);
+}
+
+task finalize_result() void {
+  for (@range(u16, Nt)) |i| {
+    res_tile[i] = @as(f16, allreduce_buf[i]);
+  }
+  pipeline_allreduce_entry();
+}
+
+fn f_pack_timestamps() void {
+  var lo_: u16 = 0;
+  var hi_: u16 = 0;
+
+  lo_ = tscStartBuffer[0];
+  hi_ = tscStartBuffer[1];
+  time_buf_f32[0] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+
+  lo_ = tscStartBuffer[2];
+  hi_ = tscEndBuffer[0];
+  time_buf_f32[1] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+
+  lo_ = tscEndBuffer[1];
+  hi_ = tscEndBuffer[2];
+  time_buf_f32[2] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+
+  lo_ = tscRefBuffer[0];
+  hi_ = tscRefBuffer[1];
+  time_ref_f32[0] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+
+  lo_ = tscRefBuffer[2];
+  hi_ = 0;
+  time_ref_f32[1] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+}
+
+task f_exit() void {
+  timestamp.get_timestamp(&tscEndBuffer);
+  timestamp.disable_tsc();
+  f_pack_timestamps();
+  sys_mod.unblock_cmd_stream();
+}
+
+comptime {
+  @bind_local_task(compute, compute_task_id);
+  @bind_local_task(broadcast_result, broadcast_task_id);
+  @bind_local_task(finalize_result, finalize_task_id);
+  @bind_local_task(f_exit, EXIT);
+
+  @export_symbol(ptr_X, "X");
+  @export_symbol(ptr_W, "W");
+  @export_symbol(ptr_res, "res");
+  @export_symbol(ptr_time_memcpy, "time_memcpy");
+  @export_symbol(ptr_time_ref, "time_ref");
+  @export_symbol(init_task);
+  @export_symbol(pipeline_allreduce_host);
+}

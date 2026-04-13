@@ -1,0 +1,205 @@
+// Copyright 2025 Cerebras Systems.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+param memcpy_params: comptime_struct;
+param c2d_params: comptime_struct;
+
+// Size of our local tile of `A`
+param Mt: u16; // Height of local matrix, or num rows per PE
+param Nt: u16; // Width of local matrix, or num cols per PE
+
+// Task IDs
+const EXIT:                     local_task_id = @get_local_task_id(9);
+const scatter_x_task_id:        local_task_id = @get_local_task_id(10);
+const broadcast_x_down_task_id: local_task_id = @get_local_task_id(11);
+const compute_task_id:          local_task_id = @get_local_task_id(12);
+const gather_result_task_id:    local_task_id = @get_local_task_id(13);
+
+const sys_mod   = @import_module("<memcpy/memcpy>", memcpy_params);
+const timestamp = @import_module("<time>");
+
+// The default values of queue IDs and DSR IDs of collectives_2d are applied implicitly.
+// See mpi_x and mpi_y of gemm-collectives_2d/pe.csl for default values of queue and DSR IDs.
+const mpi_x = @import_module("<collectives_2d/pe>", .{ .dim_params = c2d_params.x });
+const mpi_y = @import_module("<collectives_2d/pe>", .{ .dim_params = c2d_params.y });
+
+// Size of rectangle of PEs on which our kernel runs
+const Pw = @get_rectangle().width;  // Num cols of PEs in kernel
+const Ph = @get_rectangle().height; // Num rows of PEs in kernel
+
+// Only PE (0,0) will be initialized by run.py with a full copy of `x`
+var x_src = @zeros([Nt * Pw]f16);
+var ptr_x : [*]f16 = &x_src;
+
+// Only PE (0,0) will be initialized by run.py with a full copy of `b`
+var b_src = @zeros([Mt * Ph]f16);
+var ptr_b : [*]f16 = &b_src;
+
+// Each PE has its own tile of `A` initialized by run.py (column-major: A[:,j] at A_tile[j*Mt..])
+var A_tile = @zeros([Mt*Nt]f16);
+const dsd_A_tile = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt} -> A_tile[i] });
+var ptr_A : [*]f16 = &A_tile;
+
+// The tile of `x` which will be scattered across PEs received in `scatter_x()`
+// or received in `broadcast_x_down()`
+var x_tile = @zeros([Nt]f16);
+const dsd_x_tile = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Nt} -> x_tile[i]});
+
+// The tile of `b` which will be scattered across PEs received in `scatter_b()`
+var b_tile = @zeros([Mt]f16);
+const dsd_b_tile = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt} -> b_tile[i]});
+
+// The product of `A_tile` with `x_tile` (computed by the `compute()` task)
+var local_prod = @zeros([Mt]f16);
+const dsd_local_prod = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt} -> local_prod[i]});
+// f32 buffer for the row reduction (collectives_2d only provides reduce_fadds)
+var local_prod_f32 = @zeros([Mt]f32);
+
+// The sum of products across a row of PEs (f32 — result of reduce_fadds)
+var row_sum = @zeros([Mt]f32);
+
+// The final result is stored on PE (Pw-1, Ph-1)
+var final_result = @zeros([Mt * Ph]f32);
+var ptr_y : [*]f32 = &final_result;
+
+// Timing buffers (48-bit TSC packed into f32 for memcpy transfer)
+var tscStartBuffer = @zeros([timestamp.tsc_size_words]u16);
+var tscEndBuffer   = @zeros([timestamp.tsc_size_words]u16);
+var tscRefBuffer   = @zeros([timestamp.tsc_size_words]u16);
+var time_buf_f32   = @zeros([3]f32);
+var ptr_time_memcpy: [*]f32 = &time_buf_f32;
+var time_ref_f32   = @zeros([2]f32);
+var ptr_time_ref:   [*]f32 = &time_ref_f32;
+
+// DSRs for @map-based f16 GEMV (mirrors meshgemv pattern)
+const out_dest_dsr = @get_dsr(dsr_dest, 1);
+const out_src0_dsr = @get_dsr(dsr_src0, 1);
+const A_col_dsr    = @get_dsr(dsr_src1, 1);
+
+// Called by @map for each x[j]: local_prod[:] += x[j] * A[:,j]
+fn gemv_step(xj: f16) void {
+  @fmach(out_dest_dsr, out_src0_dsr, A_col_dsr, xj);
+}
+
+// Updated at runtime to store x and y IDs of PE reported by collectives library
+var px: u16;
+var py: u16;
+
+// Entrypoint into kernel
+// PE (0,0) scatters `b` into tiles across the left column of PEs
+fn main() void {
+  timestamp.enable_tsc();
+  timestamp.get_timestamp(&tscRefBuffer);
+  timestamp.get_timestamp(&tscStartBuffer);
+
+  mpi_x.init();
+  mpi_y.init();
+  px = mpi_x.pe_id;
+  py = mpi_y.pe_id;
+
+  if (px == 0) {
+    mpi_y.scatter(0, @ptrcast([*]u32, &b_src), @ptrcast([*]u32, &b_tile),
+                  Mt / 2, scatter_x_task_id);
+  } else {
+    @activate(scatter_x_task_id);
+  }
+}
+
+// Scatter `x` into tiles across the top row of PEs
+task scatter_x() void {
+  if (py == 0) {
+    mpi_x.scatter(0, @ptrcast([*]u32, &x_src), @ptrcast([*]u32, &x_tile),
+                  Nt / 2, broadcast_x_down_task_id);
+  } else {
+    @activate(broadcast_x_down_task_id);
+  }
+}
+
+// Broadcast tiles of `x` down the columns of PEs
+task broadcast_x_down() void {
+  mpi_y.broadcast(0, @ptrcast([*]u32, &x_tile), Nt / 2, compute_task_id);
+}
+
+// Compute the product of the local `x_tile` with the local `A_tile`,
+// then reduce it across rows of PEs
+task compute() void {
+
+  // @map over x: for each x[j], A_col_dsr auto-advances to next column (save_address=true)
+  @load_to_dsr(out_dest_dsr, dsd_local_prod, .{ .save_address = false });
+  @load_to_dsr(out_src0_dsr, dsd_local_prod, .{ .save_address = false });
+  @load_to_dsr(A_col_dsr, dsd_A_tile, .{ .save_address = true });
+  @map(gemv_step, dsd_x_tile);
+
+  if (px == 0) {
+    @faddh(dsd_local_prod, dsd_local_prod, dsd_b_tile);
+  }
+
+  // Promote f16 → f32 before reduction (collectives_2d only has reduce_fadds)
+  for (@range(u16, Mt)) |i| {
+    local_prod_f32[i] = @as(f32, local_prod[i]);
+  }
+
+  mpi_x.reduce_fadds(Pw - 1, @ptrcast([*]f32, &local_prod_f32), @ptrcast([*]f32, &row_sum),
+                     Mt, gather_result_task_id);
+}
+
+// Gather the product into the bottom right PE
+task gather_result() void {
+  mpi_y.gather(Ph - 1, @ptrcast([*]u32, &row_sum), @ptrcast([*]u32, &final_result),
+               Mt, EXIT);
+}
+
+fn f_pack_timestamps() void {
+  var lo_: u16 = 0;
+  var hi_: u16 = 0;
+
+  lo_ = tscStartBuffer[0]; hi_ = tscStartBuffer[1];
+  time_buf_f32[0] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+  lo_ = tscStartBuffer[2]; hi_ = tscEndBuffer[0];
+  time_buf_f32[1] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+  lo_ = tscEndBuffer[1];   hi_ = tscEndBuffer[2];
+  time_buf_f32[2] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+
+  lo_ = tscRefBuffer[0]; hi_ = tscRefBuffer[1];
+  time_ref_f32[0] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+  lo_ = tscRefBuffer[2]; hi_ = 0;
+  time_ref_f32[1] = @bitcast(f32, (@as(u32, hi_) << @as(u16, 16)) | @as(u32, lo_));
+}
+
+task f_exit() void {
+  timestamp.get_timestamp(&tscEndBuffer);
+  timestamp.disable_tsc();
+  f_pack_timestamps();
+  sys_mod.unblock_cmd_stream();
+}
+
+comptime {
+  // f16 packing requires even tile dimensions (2 f16 = 1 u32 for collectives)
+  @comptime_assert(Mt % 2 == 0);
+  @comptime_assert(Nt % 2 == 0);
+
+  @bind_local_task(scatter_x, scatter_x_task_id);
+  @bind_local_task(broadcast_x_down, broadcast_x_down_task_id);
+  @bind_local_task(compute, compute_task_id);
+  @bind_local_task(gather_result, gather_result_task_id);
+  @bind_local_task(f_exit, EXIT);
+
+  @export_symbol(ptr_A, "A");
+  @export_symbol(ptr_x, "x");
+  @export_symbol(ptr_b, "b");
+  @export_symbol(ptr_y, "y");
+  @export_symbol(ptr_time_memcpy, "time_memcpy");
+  @export_symbol(ptr_time_ref, "time_ref");
+  @export_symbol(main);
+}
