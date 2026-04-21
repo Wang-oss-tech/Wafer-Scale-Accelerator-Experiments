@@ -28,7 +28,13 @@
       "Bash(find /home/william_wang_yale/cs_sdk-1.4.0/ -name \"*.sif\" 2>/dev/null | head -3)",
       "Bash(source ~/R_2.9.0/venv_cerebras_pt/bin/activate && bash run_experiments.sh 2>&1)",
       "Bash(kill %1 2>/dev/null; pkill -f run_experiments 2>/dev/null; echo \"killed\")",
-      "Bash(cd /home/william_wang_yale/R_2.6.0/csl-examples/experiments/gemv/fp16_gemv && source ~/R_2.9.0/venv_cerebras_pt/bin/activate && bash run_experiments.sh 2>&1)"
+      "Bash(cd /home/william_wang_yale/R_2.6.0/csl-examples/experiments/gemv/fp16_gemv && source ~/R_2.9.0/venv_cerebras_pt/bin/activate && bash run_experiments.sh 2>&1)",
+      "Bash(command -v codex)",
+      "Bash(codex --version)",
+      "Bash(npm --version)",
+      "Bash(pip3 --version)",
+      "Bash(curl -s --proxy http://proxy.alcf.anl.gov:3128 https://nodejs.org/dist/latest/SHASUMS256.txt)",
+      "Bash(curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh)"
     ]
   }
 }
