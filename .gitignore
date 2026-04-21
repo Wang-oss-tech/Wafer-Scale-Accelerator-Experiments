@@ -20,3 +20,4 @@ out/
 
 # Temporary workflow directories
 wio_flows_tmpdir*/
+gemm/.claude/.nfs*
