@@ -1,26 +1,44 @@
-// SUMMA Matrix Multiplication with 4-Color Overlapped Broadcasts — fp16 variant
+// 2.5D GEMM layout — P×P grid, c=2 local steps + @fmovh broadcast for remaining steps.
 //
-// Adapted from summa_manual_multicasting_pipelined_doubleColor (f32).
-// Only change vs f32: A, B, C exported as [*]f16 instead of [*]f32.
+// Colors 0-3: unused (reserved from baseline)
+// Colors 4-7: two-tree @fmovh broadcast for SUMMA steps c..P-1 (A along row, B along col)
+//   4 = bcast_a_s0 (A row-broadcast, broadcast step index 0 = SUMMA step c)
+//   5 = bcast_a_s1 (A row-broadcast, broadcast step index 1 = SUMMA step c+1)
+//   6 = bcast_b_s0 (B col-broadcast, broadcast step index 0 = SUMMA step c)
+//   7 = bcast_b_s1 (B col-broadcast, broadcast step index 1 = SUMMA step c+1)
+//
+// Routes are set statically per PE so no runtime tile_config calls are needed.
 
 param P: u16;
 param Mt: u16;
 param Kt: u16;
 param Nt: u16;
 
-// Two color pairs: even (steps 0, 2, ...) and odd (steps 1, 3, ...)
-const a_even_color: color = @get_color(0);
-const a_odd_color:  color = @get_color(1);
-const b_even_color: color = @get_color(2);
-const b_odd_color:  color = @get_color(3);
+// Number of pre-loaded local steps
+const LOCAL_STEPS: u16 = 2;
 
-// Task IDs
+// Broadcast colors — one per (tile_type, broadcast_step_index)
+const bcast_a_s0: color = @get_color(4);
+const bcast_a_s1: color = @get_color(5);
+const bcast_b_s0: color = @get_color(6);
+const bcast_b_s1: color = @get_color(7);
+
+// Queue IDs used for broadcast colors in pe.csl
+const bcast_a_s0_oq: output_queue = @get_output_queue(2);
+const bcast_a_s0_iq: input_queue  = @get_input_queue(2);
+const bcast_a_s1_oq: output_queue = @get_output_queue(3);
+const bcast_a_s1_iq: input_queue  = @get_input_queue(3);
+const bcast_b_s0_oq: output_queue = @get_output_queue(4);
+const bcast_b_s0_iq: input_queue  = @get_input_queue(4);
+const bcast_b_s1_oq: output_queue = @get_output_queue(5);
+const bcast_b_s1_iq: input_queue  = @get_input_queue(5);
+
 const EXIT_TASK_ID:     local_task_id = @get_local_task_id(10);
 const COMPUTE_DONE_ID:  local_task_id = @get_local_task_id(11);
 
 const memcpy = @import_module("<memcpy/get_params>", .{
-  .width = P,
-  .height = P
+  .width  = P,
+  .height = P,
 });
 
 layout {
@@ -29,31 +47,146 @@ layout {
   for (@range(u16, P)) |px| {
     const memcpy_params = memcpy.get_params(px);
     for (@range(u16, P)) |py| {
+
       @set_tile_code(px, py, "pe.csl", .{
-        .memcpy_params = memcpy_params,
-        .P = P,
-        .Mt = Mt,
-        .Kt = Kt,
-        .Nt = Nt,
-        .a_even_color = a_even_color,
-        .a_odd_color = a_odd_color,
-        .b_even_color = b_even_color,
-        .b_odd_color = b_odd_color,
-        .EXIT_TASK_ID = EXIT_TASK_ID,
-        .COMPUTE_DONE_ID = COMPUTE_DONE_ID,
+        .memcpy_params  = memcpy_params,
+        .P              = P,
+        .Mt             = Mt,
+        .Kt             = Kt,
+        .Nt             = Nt,
+        .bcast_a_s0     = bcast_a_s0,
+        .bcast_a_s1     = bcast_a_s1,
+        .bcast_b_s0     = bcast_b_s0,
+        .bcast_b_s1     = bcast_b_s1,
+        .EXIT_TASK_ID   = EXIT_TASK_ID,
+        .COMPUTE_DONE_ID= COMPUTE_DONE_ID,
       });
+
+      // ── Static routes for bcast_a_s0 ─────────────────────────────────────
+      // A row-broadcast, SUMMA step k = LOCAL_STEPS + 0.
+      // Root column = LOCAL_STEPS (= 2 for P=4, c=2).
+      // Wavelet travels east from root to the rightmost PE, and west to the
+      // leftmost PE; each intermediate PE receives and forwards + delivers to RAMP.
+      {
+        const k: u16 = LOCAL_STEPS;
+        if (px == k) {
+          // Root: send east and west (boundary roots send only one direction)
+          if (k == 0) {
+            @set_color_config(px, py, bcast_a_s0, .{ .routes = .{ .rx = .{RAMP}, .tx = .{EAST} } });
+          } else if (k == P - 1) {
+            @set_color_config(px, py, bcast_a_s0, .{ .routes = .{ .rx = .{RAMP}, .tx = .{WEST} } });
+          } else {
+            @set_color_config(px, py, bcast_a_s0, .{ .routes = .{ .rx = .{RAMP}, .tx = .{EAST, WEST} } });
+          }
+        } else if (px < k) {
+          // West of root: data arrives from the east, forward west + deliver to RAMP
+          if (px == 0) {
+            @set_color_config(px, py, bcast_a_s0, .{ .routes = .{ .rx = .{EAST}, .tx = .{RAMP} } });
+          } else {
+            @set_color_config(px, py, bcast_a_s0, .{ .routes = .{ .rx = .{EAST}, .tx = .{RAMP, WEST} } });
+          }
+        } else {
+          // East of root: data arrives from the west, forward east + deliver to RAMP
+          if (px == P - 1) {
+            @set_color_config(px, py, bcast_a_s0, .{ .routes = .{ .rx = .{WEST}, .tx = .{RAMP} } });
+          } else {
+            @set_color_config(px, py, bcast_a_s0, .{ .routes = .{ .rx = .{WEST}, .tx = .{RAMP, EAST} } });
+          }
+        }
+      }
+
+      // ── Static routes for bcast_a_s1 ─────────────────────────────────────
+      // A row-broadcast, SUMMA step k = LOCAL_STEPS + 1.
+      {
+        const k: u16 = LOCAL_STEPS + 1;
+        if (px == k) {
+          if (k == 0) {
+            @set_color_config(px, py, bcast_a_s1, .{ .routes = .{ .rx = .{RAMP}, .tx = .{EAST} } });
+          } else if (k == P - 1) {
+            @set_color_config(px, py, bcast_a_s1, .{ .routes = .{ .rx = .{RAMP}, .tx = .{WEST} } });
+          } else {
+            @set_color_config(px, py, bcast_a_s1, .{ .routes = .{ .rx = .{RAMP}, .tx = .{EAST, WEST} } });
+          }
+        } else if (px < k) {
+          if (px == 0) {
+            @set_color_config(px, py, bcast_a_s1, .{ .routes = .{ .rx = .{EAST}, .tx = .{RAMP} } });
+          } else {
+            @set_color_config(px, py, bcast_a_s1, .{ .routes = .{ .rx = .{EAST}, .tx = .{RAMP, WEST} } });
+          }
+        } else {
+          if (px == P - 1) {
+            @set_color_config(px, py, bcast_a_s1, .{ .routes = .{ .rx = .{WEST}, .tx = .{RAMP} } });
+          } else {
+            @set_color_config(px, py, bcast_a_s1, .{ .routes = .{ .rx = .{WEST}, .tx = .{RAMP, EAST} } });
+          }
+        }
+      }
+
+      // ── Static routes for bcast_b_s0 ─────────────────────────────────────
+      // B col-broadcast, SUMMA step k = LOCAL_STEPS + 0.
+      // Root row = LOCAL_STEPS.  Wavelet travels south and north.
+      {
+        const k: u16 = LOCAL_STEPS;
+        if (py == k) {
+          if (k == 0) {
+            @set_color_config(px, py, bcast_b_s0, .{ .routes = .{ .rx = .{RAMP}, .tx = .{SOUTH} } });
+          } else if (k == P - 1) {
+            @set_color_config(px, py, bcast_b_s0, .{ .routes = .{ .rx = .{RAMP}, .tx = .{NORTH} } });
+          } else {
+            @set_color_config(px, py, bcast_b_s0, .{ .routes = .{ .rx = .{RAMP}, .tx = .{SOUTH, NORTH} } });
+          }
+        } else if (py < k) {
+          if (py == 0) {
+            @set_color_config(px, py, bcast_b_s0, .{ .routes = .{ .rx = .{SOUTH}, .tx = .{RAMP} } });
+          } else {
+            @set_color_config(px, py, bcast_b_s0, .{ .routes = .{ .rx = .{SOUTH}, .tx = .{RAMP, NORTH} } });
+          }
+        } else {
+          if (py == P - 1) {
+            @set_color_config(px, py, bcast_b_s0, .{ .routes = .{ .rx = .{NORTH}, .tx = .{RAMP} } });
+          } else {
+            @set_color_config(px, py, bcast_b_s0, .{ .routes = .{ .rx = .{NORTH}, .tx = .{RAMP, SOUTH} } });
+          }
+        }
+      }
+
+      // ── Static routes for bcast_b_s1 ─────────────────────────────────────
+      // B col-broadcast, SUMMA step k = LOCAL_STEPS + 1.
+      {
+        const k: u16 = LOCAL_STEPS + 1;
+        if (py == k) {
+          if (k == 0) {
+            @set_color_config(px, py, bcast_b_s1, .{ .routes = .{ .rx = .{RAMP}, .tx = .{SOUTH} } });
+          } else if (k == P - 1) {
+            @set_color_config(px, py, bcast_b_s1, .{ .routes = .{ .rx = .{RAMP}, .tx = .{NORTH} } });
+          } else {
+            @set_color_config(px, py, bcast_b_s1, .{ .routes = .{ .rx = .{RAMP}, .tx = .{SOUTH, NORTH} } });
+          }
+        } else if (py < k) {
+          if (py == 0) {
+            @set_color_config(px, py, bcast_b_s1, .{ .routes = .{ .rx = .{SOUTH}, .tx = .{RAMP} } });
+          } else {
+            @set_color_config(px, py, bcast_b_s1, .{ .routes = .{ .rx = .{SOUTH}, .tx = .{RAMP, NORTH} } });
+          }
+        } else {
+          if (py == P - 1) {
+            @set_color_config(px, py, bcast_b_s1, .{ .routes = .{ .rx = .{NORTH}, .tx = .{RAMP} } });
+          } else {
+            @set_color_config(px, py, bcast_b_s1, .{ .routes = .{ .rx = .{NORTH}, .tx = .{RAMP, SOUTH} } });
+          }
+        }
+      }
+
     }
   }
 
-  // f16 data symbols
-  @export_name("A", [*]f16, true);
-  @export_name("B", [*]f16, true);
-  @export_name("C", [*]f16, true);
-
-  // Timestamp symbols (still f32 — packed bit patterns)
+  @export_name("A",           [*]f16, true);
+  @export_name("B",           [*]f16, true);
+  @export_name("C",           [*]f16, true);
+  @export_name("A_local",     [*]f16, true);
+  @export_name("B_local",     [*]f16, true);
   @export_name("time_memcpy", [*]f32, true);
   @export_name("time_ref",    [*]f32, true);
-
   @export_name("main",        fn()void);
   @export_name("reset",       fn()void);
   @export_name("summa_host",  fn(i16, i16)void);
