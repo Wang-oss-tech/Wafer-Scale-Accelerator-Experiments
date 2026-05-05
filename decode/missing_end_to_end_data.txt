@@ -1,0 +1,28 @@
+Missing End-to-End Data Results
+================================
+Paper config:
+  LLama3-8B:  660x660 prefill + 360x360 decode
+  LLama2-13B: 750x750 prefill + 375x375 decode
+
+Formula: E2E = new_tokens / (input_seq / prefill_TPR + new_tokens / decode_TPR)
+
++----------------------------+--------+-------------------------+
+| Config                     | Grid   | TPR (tok/s)             |
++----------------------------+--------+-------------------------+
+| LLama3-8B  prefill         | 660x660 | 28688.7  |
+| LLama3-8B  decode          | 360x360 | 2255.6   |
+| LLama2-13B prefill         | 750x750 | 23902.5 |
+| LLama2-13B decode          | 375x375 | 1761.5  |
++----------------------------+--------+-------------------------+
+
+E2E Verification (LLama3-8B, using 660x660 prefill + 360x360 decode):
+  2048in/128out:   998.9 tok/s  (paper: 764.4)
+  4096in/128out:   641.5 tok/s  (paper: 604.4)
+  2048in/2048out:  2091.2 tok/s  (paper: 2370.3)
+  4096in/4096out:  2091.2 tok/s  (paper: 2459.0)
+
+E2E Verification (LLama2-13B, using 750x750 prefill + 375x375 decode):
+  2048in/128out:   808.4 tok/s  (paper: 473.9)
+  4096in/128out:   524.5 tok/s  (paper: 414.0)
+  2048in/2048out:  1640.6 tok/s  (paper: 1690.3)
+  4096in/4096out:  1640.6 tok/s  (paper: 1826.0)

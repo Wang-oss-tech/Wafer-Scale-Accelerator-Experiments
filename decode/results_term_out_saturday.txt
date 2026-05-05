@@ -1,0 +1,639 @@
+
+==========================================
+Compiling: llama8B_420 (P=420 dim=4200 ffn=14700 layer_num=32)
+==========================================
+Start compiling: 2026-04-25 22:44:27
+Event 2026-04-25 22:44:28 +0000 UTC reason=InconsistentVersion wsjob=wsjob-dz4agdfzwtvhdsrw59fsn5 message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-25 22:53:43,039 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-25 22:53:57
+Launching: llama8B_420
+Event 2026-04-25 22:53:58 +0000 UTC reason=InconsistentVersion wsjob=wsjob-n7m7zley4ohw6h6jx249dg message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Host code execution response:  WARNING: The message system is being used before initialization.
+         Messages will still be printed, but with limited support.
+COUT034   Latest HIOLIB used
+COUT034  TCP connect to: 10.254.2.67:9000
+COUT034  No credentials found, disabling TLS
+COUT034  TLS is disabled
+COUT034  TLS disabled
+COUT034  Poll
+COUT034  TCP connected
+COUT034  Connection successful
+COUT034  Local addr: 10.125.9.200:59074
+COUT034  hio_ctl:HRQ_HANDSHAKE 16062 us
+COUT034  TCP connect to: 10.254.2.67:9000
+COUT034  TLS disabled
+COUT034  Poll
+COUT034  TCP connected
+COUT034  Connection successful
+COUT034  Local addr: 10.125.9.200:59076
+COUT034  hio_ctl:HRQ_HANDSHAKE 23949 us
+COUT034  hio_ctl:HRQ_GETFABRIC 162 us
+HAAP425 22:55:57 GMT  WARNING: hio_group_program is deprecated, use hio_flows_program
+COUT002 22:55:57 GMT  ERROR: LOGGER NOT INITIALIZED:
+COUT002 22:55:57 GMT  ERROR: 		wio_groups.json is deprecated, use wio_flows.json instead
+HWKA425 22:56:26 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 4 streamer 0 P:2 C:17 (10.254.3.54:19, 10.254.3.60:19, 10.254.3.66:19, 10.254.3.72:19) mode: RoCE
+HWKA425 22:56:26 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 0 streamer 0 P:0 C:3 (10.254.3.50:5, 10.254.3.56:5, 10.254.3.62:5, 10.254.3.68:5) mode: RoCE
+HWKA425 22:56:27 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 1 streamer 0 P:1 C:10 (10.254.3.52:12, 10.254.3.58:12, 10.254.3.64:12, 10.254.3.70:12) mode: RoCE
+HWKA425 22:56:27 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 2 streamer 0 P:2 C:9 (10.254.3.54:11, 10.254.3.60:11, 10.254.3.66:11, 10.254.3.72:11) mode: RoCE
+HWKA425 22:56:28 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 3 streamer 0 P:0 C:6 (10.254.3.50:8, 10.254.3.56:8, 10.254.3.62:8, 10.254.3.68:8) mode: RoCE
+HWKA425 22:56:28 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 9 streamer 0 P:1 C:13 (10.254.3.52:15, 10.254.3.58:15, 10.254.3.64:15, 10.254.3.70:15) mode: RoCE
+HWKA425 22:56:29 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened egress stream flow 5 streamer 0 P:2 C:113 (10.254.3.54:115, 10.254.3.60:115, 10.254.3.66:115, 10.254.3.72:115) mode: RoCE
+HWKA425 22:56:29 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened egress stream flow 6 streamer 0 P:0 C:118 (10.254.3.50:120, 10.254.3.56:120, 10.254.3.62:120, 10.254.3.68:120) mode: RoCE
+HWKA425 22:56:30 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened egress stream flow 7 streamer 0 P:1 C:101 (10.254.3.52:103, 10.254.3.58:103, 10.254.3.64:103, 10.254.3.70:103) mode: RoCE
+HWKA425 22:56:30 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+P=420 bsz=1 dim_p_pe=10 pes_p_head=420 pes_p_kv_head=420 head_dim_p_pe=10 seq_len_p_pe=10 ffn_dim_p_pe=35 pe_num_p_group=21
+Warmup=5 Repeats=50
+Mean cycle count: 16469.1
+Max  cycle count: 16469.1
+Mean time: 0.0150 ms
+Decode throughput per request: 2087.2 tokens/s
+Opened egress stream flow 8 streamer 0 P:2 C:102 (10.254.3.54:104, 10.254.3.60:104, 10.254.3.66:104, 10.254.3.72:104) mode: RoCE
+
+Appliance/Real Hardware Mode on Cluster Completed
+>>> llama8B_420 TPR: 2087.2 tok/s
+
+==========================================
+Compiling: llama8B_540 (P=540 dim=4320 ffn=14580 layer_num=32)
+==========================================
+Start compiling: 2026-04-25 22:56:48
+Event 2026-04-25 22:57:28 +0000 UTC reason=InconsistentVersion wsjob=wsjob-rnmaomvjxxcz6lv8mwdyxc message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-25 23:11:41,496 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-25 23:12:08
+Launching: llama8B_540
+Event 2026-04-25 23:12:09 +0000 UTC reason=InconsistentVersion wsjob=wsjob-2vvsk764m3gvnstpgyhlst message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Host code execution response:  WARNING: The message system is being used before initialization.
+         Messages will still be printed, but with limited support.
+COUT034   Latest HIOLIB used
+COUT034  TCP connect to: 10.254.2.65:9000
+COUT034  No credentials found, disabling TLS
+COUT034  TLS is disabled
+COUT034  TLS disabled
+COUT034  Poll
+COUT034  TCP connected
+COUT034  Connection successful
+COUT034  Local addr: 10.125.9.81:38592
+COUT034  hio_ctl:HRQ_HANDSHAKE 13094 us
+COUT034  TCP connect to: 10.254.2.65:9000
+COUT034  TLS disabled
+COUT034  Poll
+COUT034  TCP connected
+COUT034  Connection successful
+COUT034  Local addr: 10.125.9.81:38598
+COUT034  hio_ctl:HRQ_HANDSHAKE 18151 us
+COUT034  hio_ctl:HRQ_GETFABRIC 225 us
+HAAP425 23:15:15 GMT  WARNING: hio_group_program is deprecated, use hio_flows_program
+COUT002 23:15:15 GMT  ERROR: LOGGER NOT INITIALIZED:
+COUT002 23:15:15 GMT  ERROR: 		wio_groups.json is deprecated, use wio_flows.json instead
+HWKA425 23:15:43 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 4 streamer 0 P:2 C:6 (10.254.3.6:8, 10.254.3.12:8, 10.254.3.18:8, 10.254.3.24:8) mode: RoCE
+HWKA425 23:15:44 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 0 streamer 0 P:0 C:41 (10.254.3.2:43, 10.254.3.8:43, 10.254.3.14:43, 10.254.3.20:43) mode: RoCE
+HWKA425 23:15:44 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 1 streamer 0 P:1 C:54 (10.254.3.4:56, 10.254.3.10:56, 10.254.3.16:56, 10.254.3.22:56) mode: RoCE
+HWKA425 23:15:45 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 2 streamer 0 P:2 C:60 (10.254.3.6:62, 10.254.3.12:62, 10.254.3.18:62, 10.254.3.24:62) mode: RoCE
+HWKA425 23:15:46 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 3 streamer 0 P:0 C:27 (10.254.3.2:29, 10.254.3.8:29, 10.254.3.14:29, 10.254.3.20:29) mode: RoCE
+HWKA425 23:15:46 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 9 streamer 0 P:1 C:38 (10.254.3.4:40, 10.254.3.10:40, 10.254.3.16:40, 10.254.3.22:40) mode: RoCE
+HWKA425 23:15:47 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened egress stream flow 5 streamer 0 P:2 C:89 (10.254.3.6:91, 10.254.3.12:91, 10.254.3.18:91, 10.254.3.24:91) mode: RoCE
+HWKA425 23:15:47 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened egress stream flow 6 streamer 0 P:0 C:115 (10.254.3.2:117, 10.254.3.8:117, 10.254.3.14:117, 10.254.3.20:117) mode: RoCE
+HWKA425 23:15:48 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened egress stream flow 7 streamer 0 P:1 C:90 (10.254.3.4:92, 10.254.3.10:92, 10.254.3.16:92, 10.254.3.22:92) mode: RoCE
+HWKA425 23:15:48 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+P=540 bsz=1 dim_p_pe=8 pes_p_head=540 pes_p_kv_head=540 head_dim_p_pe=8 seq_len_p_pe=8 ffn_dim_p_pe=27 pe_num_p_group=27
+Warmup=5 Repeats=50
+Mean cycle count: 18635.1
+Max  cycle count: 18635.1
+Mean time: 0.0169 ms
+Decode throughput per request: 1844.6 tokens/s
+Opened egress stream flow 8 streamer 0 P:2 C:101 (10.254.3.6:103, 10.254.3.12:103, 10.254.3.18:103, 10.254.3.24:103) mode: RoCE
+
+Appliance/Real Hardware Mode on Cluster Completed
+>>> llama8B_540 TPR: 1844.6 tok/s
+
+==========================================
+Compiling: llama8B_660 (P=660 dim=4620 ffn=14520 layer_num=32)
+==========================================
+Start compiling: 2026-04-25 23:15:59
+Event 2026-04-25 23:16:51 +0000 UTC reason=InconsistentVersion wsjob=wsjob-vawtbuj24iazggmxqd6biu message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Traceback (most recent call last):
+  File "/home/william_wang_yale/R_2.6.0/csl-examples/experiments/decode/compile.py", line 84, in <module>
+    artifact_id = compiler.compile(
+                  ^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/cerebras/sdk/client/sdk_appliance_client.py", line 1517, in compile
+    response = self.stub().sdk_compile(
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 946, in __call__
+    return _end_unary_response_blocking(state, call, False, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 849, in _end_unary_response_blocking
+    raise _InactiveRpcError(state)
+grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+	status = StatusCode.UNAVAILABLE
+	details = "Socket closed"
+	debug_error_string = "UNKNOWN:Error received from peer ipv4:140.221.69.69:3128 {created_time:"2026-04-25T23:32:44.401775405+00:00", grpc_status:14, grpc_message:"Socket closed"}"
+>
+>>> llama8B_660: compile failed
+
+==========================================
+Compiling: llama13B_420 (P=420 dim=5460 ffn=13860 layer_num=40)
+==========================================
+Start compiling: 2026-04-25 23:37:09
+Event 2026-04-25 23:37:32 +0000 UTC reason=InconsistentVersion wsjob=wsjob-neuqbbjdlhxjsxcpd8rx7c message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-25 23:46:51,514 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-25 23:47:10
+Launching: llama13B_420
+Event 2026-04-25 23:47:11 +0000 UTC reason=InconsistentVersion wsjob=wsjob-jzvmdsyfmfivhktfhzyhnm message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Host code execution response:  WARNING: The message system is being used before initialization.
+         Messages will still be printed, but with limited support.
+COUT034   Latest HIOLIB used
+COUT034  TCP connect to: 10.254.2.65:9000
+COUT034  No credentials found, disabling TLS
+COUT034  TLS is disabled
+COUT034  TLS disabled
+COUT034  Poll
+COUT034  TCP connected
+COUT034  Connection successful
+COUT034  Local addr: 10.125.8.202:33438
+COUT034  hio_ctl:HRQ_HANDSHAKE 11733 us
+COUT034  TCP connect to: 10.254.2.65:9000
+COUT034  TLS disabled
+COUT034  Poll
+COUT034  TCP connected
+COUT034  Connection successful
+COUT034  Local addr: 10.125.8.202:33444
+COUT034  hio_ctl:HRQ_HANDSHAKE 20553 us
+COUT034  hio_ctl:HRQ_GETFABRIC 164 us
+HAAP425 23:49:12 GMT  WARNING: hio_group_program is deprecated, use hio_flows_program
+COUT002 23:49:12 GMT  ERROR: LOGGER NOT INITIALIZED:
+COUT002 23:49:12 GMT  ERROR: 		wio_groups.json is deprecated, use wio_flows.json instead
+HWKA425 23:49:40 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 4 streamer 0 P:2 C:5 (10.254.3.6:7, 10.254.3.12:7, 10.254.3.18:7, 10.254.3.24:7) mode: RoCE
+HWKA425 23:49:41 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 0 streamer 0 P:0 C:6 (10.254.3.2:8, 10.254.3.8:8, 10.254.3.14:8, 10.254.3.20:8) mode: RoCE
+HWKA425 23:49:41 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 1 streamer 0 P:1 C:21 (10.254.3.4:23, 10.254.3.10:23, 10.254.3.16:23, 10.254.3.22:23) mode: RoCE
+HWKA425 23:49:42 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 2 streamer 0 P:2 C:54 (10.254.3.6:56, 10.254.3.12:56, 10.254.3.18:56, 10.254.3.24:56) mode: RoCE
+HWKA425 23:49:43 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 3 streamer 0 P:0 C:33 (10.254.3.2:35, 10.254.3.8:35, 10.254.3.14:35, 10.254.3.20:35) mode: RoCE
+HWKA425 23:49:43 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 9 streamer 0 P:1 C:36 (10.254.3.4:38, 10.254.3.10:38, 10.254.3.16:38, 10.254.3.22:38) mode: RoCE
+HWKA425 23:49:44 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened egress stream flow 5 streamer 0 P:1 C:116 (10.254.3.4:118, 10.254.3.10:118, 10.254.3.16:118, 10.254.3.22:118) mode: RoCE
+HWKA425 23:49:44 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened egress stream flow 6 streamer 0 P:2 C:103 (10.254.3.6:105, 10.254.3.12:105, 10.254.3.18:105, 10.254.3.24:105) mode: RoCE
+HWKA425 23:49:45 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened egress stream flow 7 streamer 0 P:0 C:122 (10.254.3.2:124, 10.254.3.8:124, 10.254.3.14:124, 10.254.3.20:124) mode: RoCE
+HWKA425 23:49:45 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+P=420 bsz=1 dim_p_pe=13 pes_p_head=420 pes_p_kv_head=420 head_dim_p_pe=13 seq_len_p_pe=10 ffn_dim_p_pe=33 pe_num_p_group=21
+Warmup=5 Repeats=50
+Mean cycle count: 16727.1
+Max  cycle count: 16727.1
+Mean time: 0.0152 ms
+Decode throughput per request: 1644.0 tokens/s
+Opened egress stream flow 8 streamer 0 P:1 C:89 (10.254.3.4:91, 10.254.3.10:91, 10.254.3.16:91, 10.254.3.22:91) mode: RoCE
+
+Appliance/Real Hardware Mode on Cluster Completed
+>>> llama13B_420 TPR: 1644.0 tok/s
+
+==========================================
+Compiling: llama13B_540 (P=540 dim=5400 ffn=14040 layer_num=40)
+==========================================
+Start compiling: 2026-04-25 23:50:00
+Event 2026-04-25 23:50:02 +0000 UTC reason=InconsistentVersion wsjob=wsjob-jhabqkcbmlpb9tdao736lh message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-26 00:03:46,116 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-26 00:04:11
+Launching: llama13B_540
+Event 2026-04-26 00:04:12 +0000 UTC reason=InconsistentVersion wsjob=wsjob-omrrn766snqwsbaldttjk8 message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Host code execution response:  WARNING: The message system is being used before initialization.
+         Messages will still be printed, but with limited support.
+COUT034   Latest HIOLIB used
+COUT034  TCP connect to: 10.254.2.68:9000
+COUT034  No credentials found, disabling TLS
+COUT034  TLS is disabled
+COUT034  TLS disabled
+COUT034  Poll
+COUT034  TCP connected
+COUT034  Connection successful
+COUT034  Local addr: 10.125.9.112:52876
+COUT034  hio_ctl:HRQ_HANDSHAKE 60177 us
+COUT034  TCP connect to: 10.254.2.68:9000
+COUT034  TLS disabled
+COUT034  Poll
+COUT034  TCP connected
+COUT034  Connection successful
+COUT034  Local addr: 10.125.9.112:52880
+COUT034  hio_ctl:HRQ_HANDSHAKE 115701 us
+COUT034  hio_ctl:HRQ_GETFABRIC 262 us
+HAAP425 00:08:31 GMT  WARNING: hio_group_program is deprecated, use hio_flows_program
+COUT002 00:08:31 GMT  ERROR: LOGGER NOT INITIALIZED:
+COUT002 00:08:31 GMT  ERROR: 		wio_groups.json is deprecated, use wio_flows.json instead
+HWKA425 00:08:59 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 4 streamer 0 P:1 C:5 (10.254.3.76:7, 10.254.3.82:7, 10.254.3.88:7, 10.254.3.94:7) mode: RoCE
+HWKA425 00:08:59 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 0 streamer 0 P:2 C:54 (10.254.3.78:56, 10.254.3.84:56, 10.254.3.90:56, 10.254.3.96:56) mode: RoCE
+HWKA425 00:09:00 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 1 streamer 0 P:0 C:54 (10.254.3.74:56, 10.254.3.80:56, 10.254.3.86:56, 10.254.3.92:56) mode: RoCE
+HWKA425 00:09:01 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 2 streamer 0 P:1 C:22 (10.254.3.76:24, 10.254.3.82:24, 10.254.3.88:24, 10.254.3.94:24) mode: RoCE
+HWKA425 00:09:01 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 3 streamer 0 P:2 C:53 (10.254.3.78:55, 10.254.3.84:55, 10.254.3.90:55, 10.254.3.96:55) mode: RoCE
+HWKA425 00:09:02 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 9 streamer 0 P:0 C:3 (10.254.3.74:5, 10.254.3.80:5, 10.254.3.86:5, 10.254.3.92:5) mode: RoCE
+HWKA425 00:09:02 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened egress stream flow 5 streamer 0 P:2 C:85 (10.254.3.78:87, 10.254.3.84:87, 10.254.3.90:87, 10.254.3.96:87) mode: RoCE
+HWKA425 00:09:03 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened egress stream flow 6 streamer 0 P:0 C:92 (10.254.3.74:94, 10.254.3.80:94, 10.254.3.86:94, 10.254.3.92:94) mode: RoCE
+HWKA425 00:09:03 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened egress stream flow 7 streamer 0 P:1 C:119 (10.254.3.76:121, 10.254.3.82:121, 10.254.3.88:121, 10.254.3.94:121) mode: RoCE
+HWKA425 00:09:04 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+P=540 bsz=1 dim_p_pe=10 pes_p_head=540 pes_p_kv_head=540 head_dim_p_pe=10 seq_len_p_pe=8 ffn_dim_p_pe=26 pe_num_p_group=27
+Warmup=5 Repeats=50
+Mean cycle count: 18886.1
+Max  cycle count: 18887.4
+Mean time: 0.0172 ms
+Decode throughput per request: 1456.1 tokens/s
+Opened egress stream flow 8 streamer 0 P:2 C:116 (10.254.3.78:118, 10.254.3.84:118, 10.254.3.90:118, 10.254.3.96:118) mode: RoCE
+
+Appliance/Real Hardware Mode on Cluster Completed
+>>> llama13B_540 TPR: 1456.1 tok/s
+
+==========================================
+Compiling: llama13B_660 (P=660 dim=5280 ffn=13860 layer_num=40)
+==========================================
+Start compiling: 2026-04-26 00:09:22
+Event 2026-04-26 00:09:23 +0000 UTC reason=InconsistentVersion wsjob=wsjob-8kxnqr8xbgbuvxfn24vzch message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Traceback (most recent call last):
+  File "/home/william_wang_yale/R_2.6.0/csl-examples/experiments/decode/compile.py", line 84, in <module>
+    artifact_id = compiler.compile(
+                  ^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/cerebras/sdk/client/sdk_appliance_client.py", line 1517, in compile
+    response = self.stub().sdk_compile(
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 946, in __call__
+    return _end_unary_response_blocking(state, call, False, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 849, in _end_unary_response_blocking
+    raise _InactiveRpcError(state)
+grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+	status = StatusCode.UNAVAILABLE
+	details = "Socket closed"
+	debug_error_string = "UNKNOWN:Error received from peer ipv4:140.221.69.69:3128 {created_time:"2026-04-26T00:26:47.213898031+00:00", grpc_status:14, grpc_message:"Socket closed"}"
+>
+>>> llama13B_660: compile failed
+
+==========================================
+Compiling: codellama_420 (P=420 dim=8400 ffn=22260 layer_num=48)
+==========================================
+Start compiling: 2026-04-26 00:29:52
+Event 2026-04-26 00:29:53 +0000 UTC reason=InconsistentVersion wsjob=wsjob-iajkz5svsfgxbbhyhrmbtn message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-26 00:38:34,334 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-26 00:38:52
+Launching: codellama_420
+Event 2026-04-26 00:38:54 +0000 UTC reason=InconsistentVersion wsjob=wsjob-n7hg8qzzx3tggmfkqyrfmo message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Host code execution response:  WARNING: The message system is being used before initialization.
+         Messages will still be printed, but with limited support.
+COUT034   Latest HIOLIB used
+COUT034  TCP connect to: 10.254.2.65:9000
+COUT034  No credentials found, disabling TLS
+COUT034  TLS is disabled
+COUT034  TLS disabled
+COUT034  Poll
+COUT034  TCP connected
+COUT034  Connection successful
+COUT034  Local addr: 10.125.9.109:46930
+COUT034  hio_ctl:HRQ_HANDSHAKE 51075 us
+COUT034  TCP connect to: 10.254.2.65:9000
+COUT034  TLS disabled
+COUT034  Poll
+COUT034  TCP connected
+COUT034  Connection successful
+COUT034  Local addr: 10.125.9.109:46940
+COUT034  hio_ctl:HRQ_HANDSHAKE 13704 us
+COUT034  hio_ctl:HRQ_GETFABRIC 158 us
+HAAP425 00:41:02 GMT  WARNING: hio_group_program is deprecated, use hio_flows_program
+COUT002 00:41:02 GMT  ERROR: LOGGER NOT INITIALIZED:
+COUT002 00:41:02 GMT  ERROR: 		wio_groups.json is deprecated, use wio_flows.json instead
+HWKA425 00:41:30 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 4 streamer 0 P:1 C:37 (10.254.3.4:39, 10.254.3.10:39, 10.254.3.16:39, 10.254.3.22:39) mode: RoCE
+HWKA425 00:41:30 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 0 streamer 0 P:2 C:14 (10.254.3.6:16, 10.254.3.12:16, 10.254.3.18:16, 10.254.3.24:16) mode: RoCE
+HWKA425 00:41:31 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 1 streamer 0 P:0 C:38 (10.254.3.2:40, 10.254.3.8:40, 10.254.3.14:40, 10.254.3.20:40) mode: RoCE
+HWKA425 00:41:31 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 2 streamer 0 P:1 C:8 (10.254.3.4:10, 10.254.3.10:10, 10.254.3.16:10, 10.254.3.22:10) mode: RoCE
+HWKA425 00:41:32 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 3 streamer 0 P:2 C:38 (10.254.3.6:40, 10.254.3.12:40, 10.254.3.18:40, 10.254.3.24:40) mode: RoCE
+HWKA425 00:41:33 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 9 streamer 0 P:0 C:44 (10.254.3.2:46, 10.254.3.8:46, 10.254.3.14:46, 10.254.3.20:46) mode: RoCE
+HWKA425 00:41:33 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened egress stream flow 5 streamer 0 P:1 C:105 (10.254.3.4:107, 10.254.3.10:107, 10.254.3.16:107, 10.254.3.22:107) mode: RoCE
+HWKA425 00:41:34 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened egress stream flow 6 streamer 0 P:2 C:101 (10.254.3.6:103, 10.254.3.12:103, 10.254.3.18:103, 10.254.3.24:103) mode: RoCE
+HWKA425 00:41:34 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened egress stream flow 7 streamer 0 P:0 C:110 (10.254.3.2:112, 10.254.3.8:112, 10.254.3.14:112, 10.254.3.20:112) mode: RoCE
+HWKA425 00:41:35 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+P=420 bsz=1 dim_p_pe=20 pes_p_head=420 pes_p_kv_head=420 head_dim_p_pe=20 seq_len_p_pe=10 ffn_dim_p_pe=53 pe_num_p_group=21
+Warmup=5 Repeats=50
+Mean cycle count: 18435.9
+Max  cycle count: 18435.9
+Mean time: 0.0168 ms
+Decode throughput per request: 1243.0 tokens/s
+Opened egress stream flow 8 streamer 0 P:1 C:90 (10.254.3.4:92, 10.254.3.10:92, 10.254.3.16:92, 10.254.3.22:92) mode: RoCE
+
+Appliance/Real Hardware Mode on Cluster Completed
+>>> codellama_420 TPR: 1243.0 tok/s
+
+==========================================
+Compiling: codellama_540 (P=540 dim=8640 ffn=22140 layer_num=48)
+==========================================
+Start compiling: 2026-04-26 00:41:53
+Event 2026-04-26 00:41:54 +0000 UTC reason=InconsistentVersion wsjob=wsjob-wint2vwfauxshru8gvmrpw message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-26 00:55:38,271 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-26 00:56:04
+Launching: codellama_540
+Event 2026-04-26 00:56:05 +0000 UTC reason=InconsistentVersion wsjob=wsjob-cwoyvfthfzdqbgqjd3zamq message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Host code execution response:  WARNING: The message system is being used before initialization.
+         Messages will still be printed, but with limited support.
+COUT034   Latest HIOLIB used
+COUT034  TCP connect to: 10.254.2.65:9000
+COUT034  No credentials found, disabling TLS
+COUT034  TLS is disabled
+COUT034  TLS disabled
+COUT034  Poll
+COUT034  TCP connected
+COUT034  Connection successful
+COUT034  Local addr: 10.125.8.167:55062
+COUT034  hio_ctl:HRQ_HANDSHAKE 12274 us
+COUT034  TCP connect to: 10.254.2.65:9000
+COUT034  TLS disabled
+COUT034  Poll
+COUT034  TCP connected
+COUT034  Connection successful
+COUT034  Local addr: 10.125.8.167:55070
+COUT034  hio_ctl:HRQ_HANDSHAKE 17432 us
+COUT034  hio_ctl:HRQ_GETFABRIC 163 us
+HAAP425 00:58:29 GMT  WARNING: hio_group_program is deprecated, use hio_flows_program
+COUT002 00:58:29 GMT  ERROR: LOGGER NOT INITIALIZED:
+COUT002 00:58:29 GMT  ERROR: 		wio_groups.json is deprecated, use wio_flows.json instead
+HWKA425 00:58:57 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 4 streamer 0 P:1 C:47 (10.254.3.4:49, 10.254.3.10:49, 10.254.3.16:49, 10.254.3.22:49) mode: RoCE
+HWKA425 00:58:58 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 0 streamer 0 P:2 C:27 (10.254.3.6:29, 10.254.3.12:29, 10.254.3.18:29, 10.254.3.24:29) mode: RoCE
+HWKA425 00:58:58 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 1 streamer 0 P:0 C:6 (10.254.3.2:8, 10.254.3.8:8, 10.254.3.14:8, 10.254.3.20:8) mode: RoCE
+HWKA425 00:58:59 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 2 streamer 0 P:1 C:28 (10.254.3.4:30, 10.254.3.10:30, 10.254.3.16:30, 10.254.3.22:30) mode: RoCE
+HWKA425 00:58:59 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 3 streamer 0 P:2 C:59 (10.254.3.6:61, 10.254.3.12:61, 10.254.3.18:61, 10.254.3.24:61) mode: RoCE
+HWKA425 00:59:00 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 9 streamer 0 P:0 C:33 (10.254.3.2:35, 10.254.3.8:35, 10.254.3.14:35, 10.254.3.20:35) mode: RoCE
+HWKA425 00:59:00 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened egress stream flow 5 streamer 0 P:2 C:87 (10.254.3.6:89, 10.254.3.12:89, 10.254.3.18:89, 10.254.3.24:89) mode: RoCE
+HWKA425 00:59:01 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened egress stream flow 6 streamer 0 P:0 C:123 (10.254.3.2:125, 10.254.3.8:125, 10.254.3.14:125, 10.254.3.20:125) mode: RoCE
+HWKA425 00:59:01 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened egress stream flow 7 streamer 0 P:1 C:93 (10.254.3.4:95, 10.254.3.10:95, 10.254.3.16:95, 10.254.3.22:95) mode: RoCE
+HWKA425 00:59:02 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+P=540 bsz=1 dim_p_pe=16 pes_p_head=540 pes_p_kv_head=540 head_dim_p_pe=16 seq_len_p_pe=8 ffn_dim_p_pe=41 pe_num_p_group=27
+Warmup=5 Repeats=50
+Mean cycle count: 20088.2
+Max  cycle count: 20088.2
+Mean time: 0.0183 ms
+Decode throughput per request: 1140.8 tokens/s
+Opened egress stream flow 8 streamer 0 P:2 C:83 (10.254.3.6:85, 10.254.3.12:85, 10.254.3.18:85, 10.254.3.24:85) mode: RoCE
+
+Appliance/Real Hardware Mode on Cluster Completed
+>>> codellama_540 TPR: 1140.8 tok/s
+
+==========================================
+Compiling: codellama_660 (P=660 dim=8580 ffn=22440 layer_num=48)
+==========================================
+Start compiling: 2026-04-26 00:59:14
+Event 2026-04-26 00:59:16 +0000 UTC reason=InconsistentVersion wsjob=wsjob-5prfvggyyrqgsgjpe2mngc message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Traceback (most recent call last):
+  File "/home/william_wang_yale/R_2.6.0/csl-examples/experiments/decode/compile.py", line 84, in <module>
+    artifact_id = compiler.compile(
+                  ^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/cerebras/sdk/client/sdk_appliance_client.py", line 1517, in compile
+    response = self.stub().sdk_compile(
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 946, in __call__
+    return _end_unary_response_blocking(state, call, False, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 849, in _end_unary_response_blocking
+    raise _InactiveRpcError(state)
+grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+	status = StatusCode.UNAVAILABLE
+	details = "Socket closed"
+	debug_error_string = "UNKNOWN:Error received from peer ipv4:140.221.69.69:3128 {grpc_message:"Socket closed", grpc_status:14, created_time:"2026-04-26T01:14:45.008784972+00:00"}"
+>
+>>> codellama_660: compile failed
+
+==========================================
+Compiling: qwen72B_420 (P=420 dim=8400 ffn=29820 layer_num=80)
+==========================================
+Start compiling: 2026-04-26 01:19:25
+Event 2026-04-26 01:19:26 +0000 UTC reason=InconsistentVersion wsjob=wsjob-5xhweptj5y4gp6rykuwjnc message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-26 01:28:39,805 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-26 01:28:55
+Launching: qwen72B_420
+Event 2026-04-26 01:28:57 +0000 UTC reason=InconsistentVersion wsjob=wsjob-f34xcly8rrphkmy87znqj6 message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Host code execution response:  WARNING: The message system is being used before initialization.
+         Messages will still be printed, but with limited support.
+COUT034   Latest HIOLIB used
+COUT034  TCP connect to: 10.254.2.67:9000
+COUT034  No credentials found, disabling TLS
+COUT034  TLS is disabled
+COUT034  TLS disabled
+COUT034  Poll
+COUT034  TCP connected
+COUT034  Connection successful
+COUT034  Local addr: 10.125.9.50:47264
+COUT034  hio_ctl:HRQ_HANDSHAKE 57720 us
+COUT034  TCP connect to: 10.254.2.67:9000
+COUT034  TLS disabled
+COUT034  Poll
+COUT034  TCP connected
+COUT034  Connection successful
+COUT034  Local addr: 10.125.9.50:47272
+COUT034  hio_ctl:HRQ_HANDSHAKE 104219 us
+COUT034  hio_ctl:HRQ_GETFABRIC 214 us
+HAAP425 01:31:27 GMT  WARNING: hio_group_program is deprecated, use hio_flows_program
+COUT002 01:31:27 GMT  ERROR: LOGGER NOT INITIALIZED:
+COUT002 01:31:27 GMT  ERROR: 		wio_groups.json is deprecated, use wio_flows.json instead
+HWKA425 01:31:55 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 4 streamer 0 P:2 C:23 (10.254.3.54:25, 10.254.3.60:25, 10.254.3.66:25, 10.254.3.72:25) mode: RoCE
+HWKA425 01:31:55 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 0 streamer 0 P:0 C:25 (10.254.3.50:27, 10.254.3.56:27, 10.254.3.62:27, 10.254.3.68:27) mode: RoCE
+HWKA425 01:31:56 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 1 streamer 0 P:1 C:25 (10.254.3.52:27, 10.254.3.58:27, 10.254.3.64:27, 10.254.3.70:27) mode: RoCE
+HWKA425 01:31:56 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 2 streamer 0 P:2 C:21 (10.254.3.54:23, 10.254.3.60:23, 10.254.3.66:23, 10.254.3.72:23) mode: RoCE
+HWKA425 01:31:57 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 3 streamer 0 P:0 C:14 (10.254.3.50:16, 10.254.3.56:16, 10.254.3.62:16, 10.254.3.68:16) mode: RoCE
+HWKA425 01:31:57 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 9 streamer 0 P:1 C:17 (10.254.3.52:19, 10.254.3.58:19, 10.254.3.64:19, 10.254.3.70:19) mode: RoCE
+HWKA425 01:31:58 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened egress stream flow 5 streamer 0 P:1 C:81 (10.254.3.52:83, 10.254.3.58:83, 10.254.3.64:83, 10.254.3.70:83) mode: RoCE
+HWKA425 01:31:59 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened egress stream flow 6 streamer 0 P:2 C:81 (10.254.3.54:83, 10.254.3.60:83, 10.254.3.66:83, 10.254.3.72:83) mode: RoCE
+HWKA425 01:31:59 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened egress stream flow 7 streamer 0 P:0 C:84 (10.254.3.50:86, 10.254.3.56:86, 10.254.3.62:86, 10.254.3.68:86) mode: RoCE
+HWKA425 01:32:00 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+P=420 bsz=1 dim_p_pe=20 pes_p_head=420 pes_p_kv_head=420 head_dim_p_pe=20 seq_len_p_pe=10 ffn_dim_p_pe=71 pe_num_p_group=21
+Warmup=5 Repeats=50
+Mean cycle count: 18964.7
+Max  cycle count: 18964.8
+Mean time: 0.0172 ms
+Decode throughput per request: 725.0 tokens/s
+Opened egress stream flow 8 streamer 0 P:1 C:90 (10.254.3.52:92, 10.254.3.58:92, 10.254.3.64:92, 10.254.3.70:92) mode: RoCE
+
+Appliance/Real Hardware Mode on Cluster Completed
+>>> qwen72B_420 TPR: 725.0 tok/s
+
+==========================================
+Compiling: qwen72B_540 (P=540 dim=8640 ffn=29700 layer_num=80)
+==========================================
+Start compiling: 2026-04-26 01:32:16
+Event 2026-04-26 01:32:17 +0000 UTC reason=InconsistentVersion wsjob=wsjob-fntxntj6qsygbyi4ptxhmq message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+2026-04-26 01:46:09,944 INFO     CSL compiler output:
+	CSL compiler produced no messages. Compilation successful.
+End compiling: 2026-04-26 01:46:36
+Launching: qwen72B_540
+Event 2026-04-26 01:46:38 +0000 UTC reason=InconsistentVersion wsjob=wsjob-gmybam63l7tddvoynu3xhb message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Could not find coordinator IP:port in cluster details
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Host code execution response:  WARNING: The message system is being used before initialization.
+         Messages will still be printed, but with limited support.
+COUT034   Latest HIOLIB used
+COUT034  TCP connect to: 10.254.2.65:9000
+COUT034  No credentials found, disabling TLS
+COUT034  TLS is disabled
+COUT034  TLS disabled
+COUT034  Poll
+COUT034  TCP connected
+COUT034  Connection successful
+COUT034  Local addr: 10.125.9.190:33432
+COUT034  hio_ctl:HRQ_HANDSHAKE 56588 us
+COUT034  TCP connect to: 10.254.2.65:9000
+COUT034  TLS disabled
+COUT034  Poll
+COUT034  TCP connected
+COUT034  Connection successful
+COUT034  Local addr: 10.125.9.190:33446
+COUT034  hio_ctl:HRQ_HANDSHAKE 100221 us
+COUT034  hio_ctl:HRQ_GETFABRIC 263 us
+HAAP425 01:51:04 GMT  WARNING: hio_group_program is deprecated, use hio_flows_program
+COUT002 01:51:04 GMT  ERROR: LOGGER NOT INITIALIZED:
+COUT002 01:51:04 GMT  ERROR: 		wio_groups.json is deprecated, use wio_flows.json instead
+HWKA425 01:51:32 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 4 streamer 0 P:1 C:9 (10.254.3.4:11, 10.254.3.10:11, 10.254.3.16:11, 10.254.3.22:11) mode: RoCE
+HWKA425 01:51:33 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 0 streamer 0 P:2 C:30 (10.254.3.6:32, 10.254.3.12:32, 10.254.3.18:32, 10.254.3.24:32) mode: RoCE
+HWKA425 01:51:33 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 1 streamer 0 P:0 C:46 (10.254.3.2:48, 10.254.3.8:48, 10.254.3.14:48, 10.254.3.20:48) mode: RoCE
+HWKA425 01:51:34 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 2 streamer 0 P:1 C:63 (10.254.3.4:65, 10.254.3.10:65, 10.254.3.16:65, 10.254.3.22:65) mode: RoCE
+HWKA425 01:51:35 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 3 streamer 0 P:2 C:28 (10.254.3.6:30, 10.254.3.12:30, 10.254.3.18:30, 10.254.3.24:30) mode: RoCE
+HWKA425 01:51:35 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened ingress stream flow 9 streamer 0 P:0 C:24 (10.254.3.2:26, 10.254.3.8:26, 10.254.3.14:26, 10.254.3.20:26) mode: RoCE
+HWKA425 01:51:36 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened egress stream flow 5 streamer 0 P:0 C:101 (10.254.3.2:103, 10.254.3.8:103, 10.254.3.14:103, 10.254.3.20:103) mode: RoCE
+HWKA425 01:51:36 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened egress stream flow 6 streamer 0 P:1 C:99 (10.254.3.4:101, 10.254.3.10:101, 10.254.3.16:101, 10.254.3.22:101) mode: RoCE
+HWKA425 01:51:37 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+Opened egress stream flow 7 streamer 0 P:2 C:106 (10.254.3.6:108, 10.254.3.12:108, 10.254.3.18:108, 10.254.3.24:108) mode: RoCE
+HWKA425 01:51:37 GMT  WARNING: src_ip_addr is not set, using routing table to figure out the source IP address
+P=540 bsz=1 dim_p_pe=16 pes_p_head=540 pes_p_kv_head=540 head_dim_p_pe=16 seq_len_p_pe=8 ffn_dim_p_pe=55 pe_num_p_group=27
+Warmup=5 Repeats=50
+Mean cycle count: 20344.2
+Max  cycle count: 20344.2
+Mean time: 0.0185 ms
+Decode throughput per request: 675.9 tokens/s
+Opened egress stream flow 8 streamer 0 P:0 C:107 (10.254.3.2:109, 10.254.3.8:109, 10.254.3.14:109, 10.254.3.20:109) mode: RoCE
+
+Appliance/Real Hardware Mode on Cluster Completed
+>>> qwen72B_540 TPR: 675.9 tok/s
+
+==========================================
+Compiling: qwen72B_660 (P=660 dim=8580 ffn=29700 layer_num=80)
+==========================================
+Start compiling: 2026-04-26 01:51:57
+Event 2026-04-26 01:51:58 +0000 UTC reason=InconsistentVersion wsjob=wsjob-yfjbrmw4hdupbyvqfw4lcs message='Warning: client semantic version 1.13.1 is inconsistent with cluster server semantic version 1.13.0, there's a risk job could fail due to inconsistent setup.'
+Empty ingress service url. Falling back to default server: 10.125.8.2:443
+Traceback (most recent call last):
+  File "/home/william_wang_yale/R_2.6.0/csl-examples/experiments/decode/compile.py", line 84, in <module>
+    artifact_id = compiler.compile(
+                  ^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/cerebras/sdk/client/sdk_appliance_client.py", line 1517, in compile
+    response = self.stub().sdk_compile(
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 946, in __call__
+    return _end_unary_response_blocking(state, call, False, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/william_wang_yale/R_2.9.0/venv_cerebras_pt/lib64/python3.11/site-packages/grpc/_channel.py", line 849, in _end_unary_response_blocking
+    raise _InactiveRpcError(state)
+grpc._channel._InactiveRpcError: <_InactiveRpcError of RPC that terminated with:
+	status = StatusCode.UNAVAILABLE
+	details = "Socket closed"
+	debug_error_string = "UNKNOWN:Error received from peer ipv4:140.221.69.69:3128 {grpc_message:"Socket closed", grpc_status:14, created_time:"2026-04-26T02:07:37.009543525+00:00"}"
+>
+>>> qwen72B_660: compile failed
+
+==========================================
+Results written to /home/william_wang_yale/R_2.6.0/csl-examples/experiments/decode/results.txt
+==========================================
+Decode TPR Results (tok/s)
+==========================
+Model            P=420                    P=540                    P=660
+Llama3-8B        2087.2     1844.6     FAILED
+Llama2-13B       1644.0    1456.1    FAILED
+CodeLlama-34B    1243.0   1140.8   FAILED
+QWen2-72B        725.0     675.9     FAILED

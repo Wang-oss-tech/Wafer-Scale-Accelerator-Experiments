@@ -1,0 +1,767 @@
+param P: i16;
+
+param dim_p_pe: i16;
+param seq_len_p_pe: i16;
+param ffn_dim_p_pe: i16;
+
+param shift_reverse: bool;
+
+var px: i16 = 0;
+var py: i16 = 0;
+
+const _dim_dim: i16 = ((dim_p_pe*dim_p_pe) / 4) * 4;
+const _seqLen_dim: i16 = ((seq_len_p_pe*dim_p_pe) / 4) * 4;
+const _seqLen_seqLen: i16 = ((seq_len_p_pe*seq_len_p_pe) / 4) * 4;
+const _ffnDim_dim: i16 = ((ffn_dim_p_pe*dim_p_pe) / 4) * 4;
+const _seqLen_ffnDim: i16 = ((seq_len_p_pe*ffn_dim_p_pe) / 4) * 4;
+
+var root: i16 = 0;
+
+var is_first_px: bool = false;
+var is_last_px: bool = false;
+
+param c_right_recv: color;
+param c_right_send: color;
+param c_left_recv: color;
+param c_left_send: color;
+
+param x_send_color: color;
+param x_recv_color: color;
+param x_tran_color: color;
+
+param x_shift_send_color: color;
+param x_shift_recv_color: color;
+param x_shift_tran_color: color;
+
+param x_shift_re_send_color: color;
+param x_shift_re_recv_color: color;
+param x_shift_re_tran_color: color;
+
+param y_send_color: color;
+param y_recv_color: color;
+param y_tran_color: color;
+
+param left_bd_color: color;
+param right_bd_color: color;
+// bd_recv_color: the single broadcast-back receive color for this PE.
+// For px < root: C_L_B (left broadcast). For px > root: C_R_B (right broadcast).
+// For px == root: unused (C_L_B passed as dummy). Set by layout per PE.
+param bd_recv_color: color;
+
+// --------------------------------------------------------------------------
+// WSE-3 micro-task IDs for async @load_to_dsr on fabric DSDs.
+// ut1/ut2: x-axis two-hop (left_matrix) and shift channels.
+// ut3/ut4: y-axis two-hop (right_matrix) channels.
+// --------------------------------------------------------------------------
+const ut1 = @get_ut_id(1);
+const ut2 = @get_ut_id(2);
+const ut3 = @get_ut_id(3);
+const ut4 = @get_ut_id(4);
+
+// --------------------------------------------------------------------------
+// WSE-3 queue assignments.
+// Available input queues: 2-7 (0 and 1 are reserved by memcpy).
+// Available output queues: 1-7 (0 reserved by memcpy).
+//
+// Input queue map:
+//   2 → x_recv_color       (two-hop matrix transfer, x-axis)
+//   3 → bd_recv_color       (broadcast-back recv; C_L_B for px<root, C_R_B for px>root)
+//   4 → c_right_recv        (allreduce right recv)
+//   5 → c_left_recv         (allreduce left recv)
+//   6 → x_shift_recv OR x_shift_re_recv (compile-time conditional on shift_reverse)
+//   7 → y_recv_color        (two-hop matrix transfer, y-axis)
+//
+// Output queue map:
+//   1 → x_shift_send OR x_shift_re_send (conditional on shift_reverse)
+//   2 → y_send_color
+//   3 → x_send_color
+//   4 → c_right_send        (allreduce right send)
+//   5 → c_left_send         (allreduce left send)
+//   6 → left_bd_color       (broadcast-back left send, root only)
+//   7 → right_bd_color      (broadcast-back right send, root only)
+// --------------------------------------------------------------------------
+
+const allreduce_right_recv_qid = @get_input_queue(4);
+const allreduce_right_send_qid = @get_output_queue(4);
+const allreduce_left_recv_qid  = @get_input_queue(5);
+const allreduce_left_send_qid  = @get_output_queue(5);
+const bd_recv_qid              = @get_input_queue(3);
+const left_bd_send_qid         = @get_output_queue(6);
+const right_bd_send_qid        = @get_output_queue(7);
+
+// simd_mode = .{ .simd_64 = true } is used for WSE-3 simulator.
+// compile.py patches .simd_64 -> .simd_max for hardware compilation.
+const mv_right_send = @get_dsd(fabout_dsd, .{
+    .extent = seq_len_p_pe,
+    .fabric_color = c_right_send,
+    .output_queue = allreduce_right_send_qid,
+    .simd_mode = .{ .simd_64 = true },
+});
+
+const mv_right_recv = @get_dsd(fabin_dsd, .{
+    .extent = seq_len_p_pe,
+    .fabric_color = c_right_recv,
+    .input_queue = allreduce_right_recv_qid,
+    .simd_mode = .{ .simd_64 = true },
+});
+
+const mv_left_send = @get_dsd(fabout_dsd, .{
+    .extent = seq_len_p_pe,
+    .fabric_color = c_left_send,
+    .output_queue = allreduce_left_send_qid,
+    .simd_mode = .{ .simd_64 = true },
+});
+
+const mv_left_recv = @get_dsd(fabin_dsd, .{
+    .extent = seq_len_p_pe,
+    .fabric_color = c_left_recv,
+    .input_queue = allreduce_left_recv_qid,
+    .simd_mode = .{ .simd_64 = true },
+});
+
+// _max aliases: same DSDs, used in mv_allreduce_max_x (no simd distinction on WSE-3).
+const mv_right_send_max = mv_right_send;
+const mv_right_recv_max = mv_right_recv;
+const mv_left_send_max  = mv_left_send;
+const mv_left_recv_max  = mv_left_recv;
+
+const left_bd_send = @get_dsd(fabout_dsd, .{
+    .extent = seq_len_p_pe,
+    .fabric_color = left_bd_color,
+    .output_queue = left_bd_send_qid,
+    .simd_mode = .{ .simd_64 = true },
+});
+
+const right_bd_send = @get_dsd(fabout_dsd, .{
+    .extent = seq_len_p_pe,
+    .fabric_color = right_bd_color,
+    .output_queue = right_bd_send_qid,
+    .simd_mode = .{ .simd_64 = true },
+});
+
+// Unified broadcast-back recv DSD: bd_recv_color is C_L_B for px<root, C_R_B for px>root.
+// The root PE never receives (it only sends), so bd_recv is never used at root.
+const bd_recv = @get_dsd(fabin_dsd, .{
+    .extent = seq_len_p_pe,
+    .fabric_color = bd_recv_color,
+    .input_queue = bd_recv_qid,
+    .simd_mode = .{ .simd_64 = true },
+});
+
+var vector_buf_dsd = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{seq_len_p_pe} -> dummy[i] });
+const vector_buf_dsr = @get_dsr(dsr_src1, 2);
+
+fn mv_allreduce_max_x(vector_buf_ptr: [*]f16) void {
+    vector_buf_dsd = @set_dsd_base_addr(vector_buf_dsd, vector_buf_ptr);
+    @load_to_dsr(vector_buf_dsr, vector_buf_dsd);
+
+    if (px == root) {
+        @fmaxh(vector_buf_dsd, mv_right_recv_max, vector_buf_dsr);
+        @fmaxh(vector_buf_dsd, mv_left_recv_max, vector_buf_dsr);
+
+        @fmovh(left_bd_send, vector_buf_dsr);
+        @fmovh(right_bd_send, vector_buf_dsr);
+    } else {
+        if (is_first_px) {
+            @fmovh(mv_right_send_max, vector_buf_dsr);
+            @fmovh(vector_buf_dsd, bd_recv);
+        } else if (is_last_px) {
+            @fmovh(mv_left_send_max, vector_buf_dsr);
+            @fmovh(vector_buf_dsd, bd_recv);
+        } else {
+            if (px < root) {
+                @fmaxh(mv_right_send_max, mv_right_recv_max, vector_buf_dsr);
+                @fmovh(vector_buf_dsd, bd_recv);
+            } else { // px > root
+                @fmaxh(mv_left_send_max, mv_left_recv_max, vector_buf_dsr);
+                @fmovh(vector_buf_dsd, bd_recv);
+            }
+        }
+    }
+}
+
+fn mv_allreduce_add_x(vector_buf_ptr: [*]f16) void {
+    vector_buf_dsd = @set_dsd_base_addr(vector_buf_dsd, vector_buf_ptr);
+    @load_to_dsr(vector_buf_dsr, vector_buf_dsd);
+
+    if (px == root) {
+        @faddh(vector_buf_dsd, mv_left_recv, vector_buf_dsr);
+        @faddh(vector_buf_dsd, mv_right_recv, vector_buf_dsr);
+
+        @fmovh(left_bd_send, vector_buf_dsr);
+        @fmovh(right_bd_send, vector_buf_dsr);
+    } else {
+        if (is_first_px) {
+            @fmovh(mv_right_send, vector_buf_dsr);
+            @fmovh(vector_buf_dsd, bd_recv);
+        } else if (is_last_px) {
+            @fmovh(mv_left_send, vector_buf_dsr);
+            @fmovh(vector_buf_dsd, bd_recv);
+        } else {
+            if (px < root) {
+                @faddh(mv_right_send, mv_right_recv, vector_buf_dsr);
+                @fmovh(vector_buf_dsd, bd_recv);
+            } else { // px > root
+                @faddh(mv_left_send, mv_left_recv, vector_buf_dsr);
+                @fmovh(vector_buf_dsd, bd_recv);
+            }
+        }
+    }
+}
+
+const mv_right_send_seqLen_seqLen = @get_dsd(fabout_dsd, .{
+    .extent = seq_len_p_pe * seq_len_p_pe,
+    .fabric_color = c_right_send,
+    .output_queue = allreduce_right_send_qid,
+    .simd_mode = .{ .simd_64 = true },
+});
+
+const mv_right_recv_seqLen_seqLen = @get_dsd(fabin_dsd, .{
+    .extent = seq_len_p_pe * seq_len_p_pe,
+    .fabric_color = c_right_recv,
+    .input_queue = allreduce_right_recv_qid,
+    .simd_mode = .{ .simd_64 = true },
+});
+
+const mv_left_send_seqLen_seqLen = @get_dsd(fabout_dsd, .{
+    .extent = seq_len_p_pe * seq_len_p_pe,
+    .fabric_color = c_left_send,
+    .output_queue = allreduce_left_send_qid,
+    .simd_mode = .{ .simd_64 = true },
+});
+
+const mv_left_recv_seqLen_seqLen = @get_dsd(fabin_dsd, .{
+    .extent = seq_len_p_pe * seq_len_p_pe,
+    .fabric_color = c_left_recv,
+    .input_queue = allreduce_left_recv_qid,
+    .simd_mode = .{ .simd_64 = true },
+});
+
+var reduce_send_dsd = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{seq_len_p_pe * seq_len_p_pe} -> dummy[i] });
+var reduce_recv_dsd = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{seq_len_p_pe * seq_len_p_pe} -> dummy[i] });
+
+const reduce_dest_dsr_1 = @get_dsr(dsr_dest, 1);
+const reduce_src0_dsr_1 = @get_dsr(dsr_src0, 1);
+const reduce_src1_dsr_1 = @get_dsr(dsr_src1, 1);
+
+const reduce_dest_dsr_2 = @get_dsr(dsr_dest, 2);
+const reduce_src0_dsr_2 = @get_dsr(dsr_src0, 2);
+const reduce_src1_dsr_2 = @get_dsr(dsr_src1, 2);
+
+fn matmul_T_reduce_add_x(root_: i16, matrix_send_buf_ptr: [*]f16, matrix_recv_buf_ptr: [*]f16) void {
+
+    reduce_send_dsd = @set_dsd_base_addr(reduce_send_dsd, matrix_send_buf_ptr);
+    @load_to_dsr(reduce_src0_dsr_1, reduce_send_dsd);
+
+    if (px == root_) {
+
+        reduce_recv_dsd = @set_dsd_base_addr(reduce_recv_dsd, matrix_recv_buf_ptr);
+        @load_to_dsr(reduce_dest_dsr_1, reduce_recv_dsd);
+        @load_to_dsr(reduce_dest_dsr_2, reduce_recv_dsd);
+        @load_to_dsr(reduce_src0_dsr_2, reduce_recv_dsd);
+
+        if (is_first_px) {
+            @faddh(reduce_dest_dsr_1, reduce_src0_dsr_1, mv_left_recv_seqLen_seqLen);
+        } else if (is_last_px) {
+            @faddh(reduce_dest_dsr_1, reduce_src0_dsr_1, mv_right_recv_seqLen_seqLen);
+        } else {
+            @faddh(reduce_dest_dsr_1, reduce_src0_dsr_1, mv_left_recv_seqLen_seqLen);
+            @faddh(reduce_dest_dsr_2, reduce_src0_dsr_2, mv_right_recv_seqLen_seqLen);
+        }
+
+    } else {
+
+        @load_to_dsr(reduce_src1_dsr_1, reduce_send_dsd);
+
+        if (is_first_px) {
+            @load_to_dsr(reduce_dest_dsr_1, mv_right_send_seqLen_seqLen);
+            @fmovh(reduce_dest_dsr_1, reduce_src1_dsr_1);
+        } else if (is_last_px) {
+            @load_to_dsr(reduce_dest_dsr_1, mv_left_send_seqLen_seqLen);
+            @fmovh(reduce_dest_dsr_1, reduce_src1_dsr_1);
+        } else {
+
+            if (px < root_) {
+                @load_to_dsr(reduce_dest_dsr_1, mv_right_send_seqLen_seqLen);
+                @faddh(reduce_dest_dsr_1, mv_right_recv_seqLen_seqLen, reduce_src1_dsr_1);
+            } else { // px > root_
+                @load_to_dsr(reduce_dest_dsr_1, mv_left_send_seqLen_seqLen);
+                @faddh(reduce_dest_dsr_1, mv_left_recv_seqLen_seqLen, reduce_src1_dsr_1);
+            }
+
+        }
+
+    }
+
+}
+
+// --------------------------------------------------------------------------
+// Two-hop matrix transfer fabric DSDs (x-axis left, y-axis right).
+// Multiple sizes exist; each gets its own DSR slot, all pre-loaded at comptime.
+// --------------------------------------------------------------------------
+
+// x-axis (left matrix) fabric DSDs
+const left_matrix_in_dsd_seqLen_dim = @get_dsd(fabin_dsd, .{
+    .fabric_color = x_recv_color, .extent = _seqLen_dim,
+    .input_queue = @get_input_queue(2),
+    .simd_mode = .{ .simd_64 = true }
+});
+const left_matrix_out_dsd_seqLen_dim = @get_dsd(fabout_dsd, .{
+    .fabric_color = x_send_color, .extent = _seqLen_dim,
+    .output_queue = @get_output_queue(3),
+    .simd_mode = .{ .simd_64 = true }
+});
+
+const left_matrix_in_dsd_seqLen_seqLen = @get_dsd(fabin_dsd, .{
+    .fabric_color = x_recv_color, .extent = _seqLen_seqLen,
+    .input_queue = @get_input_queue(2),
+    .simd_mode = .{ .simd_64 = true }
+});
+const left_matrix_out_dsd_seqLen_seqLen = @get_dsd(fabout_dsd, .{
+    .fabric_color = x_send_color, .extent = _seqLen_seqLen,
+    .output_queue = @get_output_queue(3),
+    .simd_mode = .{ .simd_64 = true }
+});
+
+const left_matrix_in_dsd_seqLen_ffnDim = @get_dsd(fabin_dsd, .{
+    .fabric_color = x_recv_color, .extent = _seqLen_ffnDim,
+    .input_queue = @get_input_queue(2),
+    .simd_mode = .{ .simd_64 = true }
+});
+const left_matrix_out_dsd_seqLen_ffnDim = @get_dsd(fabout_dsd, .{
+    .fabric_color = x_send_color, .extent = _seqLen_ffnDim,
+    .output_queue = @get_output_queue(3),
+    .simd_mode = .{ .simd_64 = true }
+});
+
+// y-axis (right matrix) fabric DSDs
+const right_matrix_in_dsd_dim_dim = @get_dsd(fabin_dsd, .{
+    .fabric_color = y_recv_color, .extent = _dim_dim,
+    .input_queue = @get_input_queue(7),
+    .simd_mode = .{ .simd_64 = true }
+});
+const right_matrix_out_dsd_dim_dim = @get_dsd(fabout_dsd, .{
+    .fabric_color = y_send_color, .extent = _dim_dim,
+    .output_queue = @get_output_queue(2),
+    .simd_mode = .{ .simd_64 = true }
+});
+
+const right_matrix_in_dsd_seqLen_dim = @get_dsd(fabin_dsd, .{
+    .fabric_color = y_recv_color, .extent = _seqLen_dim,
+    .input_queue = @get_input_queue(7),
+    .simd_mode = .{ .simd_64 = true }
+});
+const right_matrix_out_dsd_seqLen_dim = @get_dsd(fabout_dsd, .{
+    .fabric_color = y_send_color, .extent = _seqLen_dim,
+    .output_queue = @get_output_queue(2),
+    .simd_mode = .{ .simd_64 = true }
+});
+
+const right_matrix_in_dsd_ffnDim_dim = @get_dsd(fabin_dsd, .{
+    .fabric_color = y_recv_color, .extent = _ffnDim_dim,
+    .input_queue = @get_input_queue(7),
+    .simd_mode = .{ .simd_64 = true }
+});
+const right_matrix_out_dsd_ffnDim_dim = @get_dsd(fabout_dsd, .{
+    .fabric_color = y_send_color, .extent = _ffnDim_dim,
+    .output_queue = @get_output_queue(2),
+    .simd_mode = .{ .simd_64 = true }
+});
+
+// --------------------------------------------------------------------------
+// DSR slots for two-hop comm.
+// Each (left,right) size pair gets its own DSR pair.
+// All are pre-loaded at comptime with ut_ids so async callbacks work on WSE-3.
+//
+// DSR assignment:
+//   left_out DSRs:  dsr_dest  5, 6, 7        (seqLen_dim, seqLen_seqLen, seqLen_ffnDim)
+//   left_in  DSRs:  dsr_src1  5, 6, 7        (seqLen_dim, seqLen_seqLen, seqLen_ffnDim)
+//   right_out DSRs: dsr_dest  8, 9, 10       (dim_dim, seqLen_dim, ffnDim_dim)
+//   right_in  DSRs: dsr_src1  8, 9, 10       (dim_dim, seqLen_dim, ffnDim_dim)
+// --------------------------------------------------------------------------
+
+const left_matrix_out_dsr_seqLen_dim    = @get_dsr(dsr_dest, 5);
+const left_matrix_in_dsr_seqLen_dim     = @get_dsr(dsr_src1, 5);
+
+const left_matrix_out_dsr_seqLen_seqLen = @get_dsr(dsr_dest, 6);
+const left_matrix_in_dsr_seqLen_seqLen  = @get_dsr(dsr_src1, 6);
+
+const left_matrix_out_dsr_seqLen_ffnDim = @get_dsr(dsr_dest, 7);
+const left_matrix_in_dsr_seqLen_ffnDim  = @get_dsr(dsr_src1, 7);
+
+const right_matrix_out_dsr_dim_dim      = @get_dsr(dsr_dest, 8);
+const right_matrix_in_dsr_dim_dim       = @get_dsr(dsr_src1, 8);
+
+const right_matrix_out_dsr_seqLen_dim   = @get_dsr(dsr_dest, 9);
+const right_matrix_in_dsr_seqLen_dim    = @get_dsr(dsr_src1, 9);
+
+const right_matrix_out_dsr_ffnDim_dim   = @get_dsr(dsr_dest, 10);
+const right_matrix_in_dsr_ffnDim_dim    = @get_dsr(dsr_src1, 10);
+
+// Runtime-selected DSR pointers (set by mm_two_hop_comm / mm_two_hop_comm_T
+// before calling _impl). Using i32 as opaque pointer to DSR index.
+// In CSL there is no pointer-to-DSR type, so we use DSR-indexed dispatch.
+// We track which size was selected via a runtime variable.
+var two_hop_left_size: i16  = 0;  // 0=seqLen_dim, 1=seqLen_seqLen, 2=seqLen_ffnDim
+var two_hop_right_size: i16 = 0;  // 0=dim_dim, 1=seqLen_dim, 2=ffnDim_dim
+
+// Shared mem DSDs for matrix buffers (base set at runtime)
+const dummy = @zeros([1]f16);
+
+var left_matrix_send_dsd = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{1} -> dummy[i] });
+var left_matrix_recv_dsd = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{1} -> dummy[i] });
+
+var right_matrix_send_dsd = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{1} -> dummy[i] });
+var right_matrix_recv_dsd = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{1} -> dummy[i] });
+
+var right_matrix_send_dsd_seqLen_dim = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{_seqLen_dim} -> dummy[i] });
+var right_matrix_recv_dsd_seqLen_dim = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{_seqLen_dim} -> dummy[i] });
+
+const left_send_dsr = @get_dsr(dsr_src1, 3);
+const left_recv_dsr = @get_dsr(dsr_dest, 3);
+
+const right_send_dsr = @get_dsr(dsr_src1, 4);
+const right_recv_dsr = @get_dsr(dsr_dest, 4);
+
+const left_matrix_shift_finish_id: local_task_id = @get_local_task_id(26);
+
+param left_matrix_finish_id: local_task_id;
+param right_matrix_finish_id: local_task_id;
+param left_matrix_shift_callback: fn ()void;
+
+task left_matrix_shift_finish() void {
+    @block(left_matrix_shift_finish_id);
+    left_matrix_shift_callback();
+}
+
+const math_lib = @import_module("<math>");
+
+fn init_(_px: i16, _py: i16) void {
+    px = _px;
+    py = _py;
+
+    root = P / 2;
+
+    if (px == 0) {
+        is_first_px = true;
+    }
+
+    if (px == P-1) {
+        is_last_px = true;
+    }
+}
+
+// --------------------------------------------------------------------------
+// mm_two_hop_comm: SUMMA two-hop communication for left (x-axis) and right
+// (y-axis) matrices. Selects DSR pair at step==0, then fires async @mov16.
+// On WSE-3 the fabric DSDs are pre-loaded into DSRs in comptime blocks below
+// with .ut_id so the hardware knows which micro-task slot to use.
+// --------------------------------------------------------------------------
+
+fn mm_two_hop_comm(left_matrix_send_buffer_ptr: [*]f16, right_matrix_send_buffer_ptr: [*]f16, left_matrix_recv_buffer_ptr: [*]f16, right_matrix_recv_buffer_ptr: [*]f16, step: i16, Mt: i16, Kt: i16, Nt: i16) void {
+
+    if (step == 0) {
+        var _Mt_Kt = ((Mt * Kt) / 4) * 4;
+        var _Kt_Nt = ((Kt * Nt) / 4) * 4;
+
+        left_matrix_send_dsd = @set_dsd_length(left_matrix_send_dsd, @bitcast(u16, _Mt_Kt));
+        left_matrix_recv_dsd = @set_dsd_length(left_matrix_recv_dsd, @bitcast(u16, _Mt_Kt));
+
+        right_matrix_send_dsd = @set_dsd_length(right_matrix_send_dsd, @bitcast(u16, _Kt_Nt));
+        right_matrix_recv_dsd = @set_dsd_length(right_matrix_recv_dsd, @bitcast(u16, _Kt_Nt));
+
+        if (Kt == dim_p_pe) {
+            two_hop_left_size = 0; // seqLen_dim
+            if (Nt == dim_p_pe) {
+                two_hop_right_size = 0; // dim_dim
+            } else if (Nt == ffn_dim_p_pe) {
+                two_hop_right_size = 2; // ffnDim_dim
+            }
+        } else if (Kt == seq_len_p_pe) {
+            two_hop_left_size = 1; // seqLen_seqLen
+            if (Nt == dim_p_pe) {
+                two_hop_right_size = 1; // seqLen_dim
+            }
+        } else if (Kt == ffn_dim_p_pe) {
+            two_hop_left_size = 2; // seqLen_ffnDim
+            if (Nt == dim_p_pe) {
+                two_hop_right_size = 1; // seqLen_dim (re-used for ffnDim→dim)
+                // Note: ffnDim_dim on y-axis shares the seqLen_dim queue extent
+                // Only the actual fabric DSD extent matters; right_size=2 = ffnDim_dim.
+                two_hop_right_size = 2; // ffnDim_dim
+            }
+        }
+    }
+
+    mm_two_hop_comm_impl(left_matrix_send_buffer_ptr, right_matrix_send_buffer_ptr, left_matrix_recv_buffer_ptr, right_matrix_recv_buffer_ptr);
+}
+
+fn mm_two_hop_comm_impl(left_matrix_send_buffer_ptr: [*]f16, right_matrix_send_buffer_ptr: [*]f16, left_matrix_recv_buffer_ptr: [*]f16, right_matrix_recv_buffer_ptr: [*]f16) void {
+
+    left_matrix_send_dsd = @set_dsd_base_addr(left_matrix_send_dsd, left_matrix_send_buffer_ptr);
+    right_matrix_send_dsd = @set_dsd_base_addr(right_matrix_send_dsd, right_matrix_send_buffer_ptr);
+    left_matrix_recv_dsd = @set_dsd_base_addr(left_matrix_recv_dsd, left_matrix_recv_buffer_ptr);
+    right_matrix_recv_dsd = @set_dsd_base_addr(right_matrix_recv_dsd, right_matrix_recv_buffer_ptr);
+
+    @load_to_dsr(left_send_dsr, left_matrix_send_dsd);
+    @load_to_dsr(left_recv_dsr, left_matrix_recv_dsd);
+    @load_to_dsr(right_send_dsr, right_matrix_send_dsd);
+    @load_to_dsr(right_recv_dsr, right_matrix_recv_dsd);
+
+    if (two_hop_left_size == 0) {
+        @mov16(left_matrix_out_dsr_seqLen_dim, left_send_dsr, .{.async=true, .unblock=left_matrix_finish_id});
+        @mov16(left_recv_dsr, left_matrix_in_dsr_seqLen_dim, .{.async=true, .activate=left_matrix_finish_id});
+    } else if (two_hop_left_size == 1) {
+        @mov16(left_matrix_out_dsr_seqLen_seqLen, left_send_dsr, .{.async=true, .unblock=left_matrix_finish_id});
+        @mov16(left_recv_dsr, left_matrix_in_dsr_seqLen_seqLen, .{.async=true, .activate=left_matrix_finish_id});
+    } else {
+        @mov16(left_matrix_out_dsr_seqLen_ffnDim, left_send_dsr, .{.async=true, .unblock=left_matrix_finish_id});
+        @mov16(left_recv_dsr, left_matrix_in_dsr_seqLen_ffnDim, .{.async=true, .activate=left_matrix_finish_id});
+    }
+
+    if (two_hop_right_size == 0) {
+        @mov16(right_matrix_out_dsr_dim_dim, right_send_dsr, .{.async=true, .unblock=right_matrix_finish_id});
+        @mov16(right_recv_dsr, right_matrix_in_dsr_dim_dim, .{.async=true, .activate=right_matrix_finish_id});
+    } else if (two_hop_right_size == 1) {
+        @mov16(right_matrix_out_dsr_seqLen_dim, right_send_dsr, .{.async=true, .unblock=right_matrix_finish_id});
+        @mov16(right_recv_dsr, right_matrix_in_dsr_seqLen_dim, .{.async=true, .activate=right_matrix_finish_id});
+    } else {
+        @mov16(right_matrix_out_dsr_ffnDim_dim, right_send_dsr, .{.async=true, .unblock=right_matrix_finish_id});
+        @mov16(right_recv_dsr, right_matrix_in_dsr_ffnDim_dim, .{.async=true, .activate=right_matrix_finish_id});
+    }
+}
+
+fn mm_two_hop_comm_T(right_matrix_send_buffer_ptr: [*]f16, right_matrix_recv_buffer_ptr: [*]f16, step: i16) void {
+
+    if (step == 0) {
+        right_matrix_send_dsd = @set_dsd_length(right_matrix_send_dsd, @bitcast(u16, _seqLen_dim));
+        right_matrix_recv_dsd = @set_dsd_length(right_matrix_recv_dsd, @bitcast(u16, _seqLen_dim));
+        two_hop_right_size = 1; // seqLen_dim on y-axis
+    }
+
+    mm_two_hop_comm_T_impl(right_matrix_send_buffer_ptr, right_matrix_recv_buffer_ptr);
+}
+
+fn mm_two_hop_comm_T_impl(right_matrix_send_buffer_ptr: [*]f16, right_matrix_recv_buffer_ptr: [*]f16) void {
+
+    right_matrix_send_dsd_seqLen_dim = @set_dsd_base_addr(right_matrix_send_dsd_seqLen_dim, right_matrix_send_buffer_ptr);
+    right_matrix_recv_dsd_seqLen_dim = @set_dsd_base_addr(right_matrix_recv_dsd_seqLen_dim, right_matrix_recv_buffer_ptr);
+
+    @load_to_dsr(right_send_dsr, right_matrix_send_dsd_seqLen_dim);
+    @load_to_dsr(right_recv_dsr, right_matrix_recv_dsd_seqLen_dim);
+
+    @mov16(right_matrix_out_dsr_seqLen_dim, right_send_dsr, .{.async=true, .unblock=right_matrix_finish_id});
+    @mov16(right_recv_dsr, right_matrix_in_dsr_seqLen_dim, .{.async=true, .activate=right_matrix_finish_id});
+}
+
+// --------------------------------------------------------------------------
+// Shift fabric DSDs (x-axis, both directions).
+// Non-reverse and reverse share input queue 6 / output queue 1 via the
+// shift_reverse compile-time conditional in @initialize_queue below.
+// Each still gets its own DSR slot and its own ut_id assignment in comptime.
+// --------------------------------------------------------------------------
+
+const left_matrix_shift_in_dsd_seqLen_dim = @get_dsd(fabin_dsd, .{
+    .fabric_color = x_shift_recv_color, .extent = _seqLen_dim,
+    .input_queue = @get_input_queue(6),
+    .simd_mode = .{ .simd_64 = true }
+});
+const left_matrix_shift_out_dsd_seqLen_dim = @get_dsd(fabout_dsd, .{
+    .fabric_color = x_shift_send_color, .extent = _seqLen_dim,
+    .output_queue = @get_output_queue(1),
+    .simd_mode = .{ .simd_64 = true }
+});
+
+const left_matrix_shift_re_in_dsd_seqLen_dim = @get_dsd(fabin_dsd, .{
+    .fabric_color = x_shift_re_recv_color, .extent = _seqLen_dim,
+    .input_queue = @get_input_queue(6),
+    .simd_mode = .{ .simd_64 = true }
+});
+const left_matrix_shift_re_out_dsd_seqLen_dim = @get_dsd(fabout_dsd, .{
+    .fabric_color = x_shift_re_send_color, .extent = _seqLen_dim,
+    .output_queue = @get_output_queue(1),
+    .simd_mode = .{ .simd_64 = true }
+});
+
+const left_matrix_shift_in_dsd_seqLen_seqLen = @get_dsd(fabin_dsd, .{
+    .fabric_color = x_shift_recv_color, .extent = _seqLen_seqLen,
+    .input_queue = @get_input_queue(6),
+    .simd_mode = .{ .simd_64 = true }
+});
+const left_matrix_shift_out_dsd_seqLen_seqLen = @get_dsd(fabout_dsd, .{
+    .fabric_color = x_shift_send_color, .extent = _seqLen_seqLen,
+    .output_queue = @get_output_queue(1),
+    .simd_mode = .{ .simd_64 = true }
+});
+
+const left_matrix_shift_re_in_dsd_seqLen_seqLen = @get_dsd(fabin_dsd, .{
+    .fabric_color = x_shift_re_recv_color, .extent = _seqLen_seqLen,
+    .input_queue = @get_input_queue(6),
+    .simd_mode = .{ .simd_64 = true }
+});
+const left_matrix_shift_re_out_dsd_seqLen_seqLen = @get_dsd(fabout_dsd, .{
+    .fabric_color = x_shift_re_send_color, .extent = _seqLen_seqLen,
+    .output_queue = @get_output_queue(1),
+    .simd_mode = .{ .simd_64 = true }
+});
+
+const left_matrix_shift_in_dsd_seqLen_ffnDim = @get_dsd(fabin_dsd, .{
+    .fabric_color = x_shift_recv_color, .extent = _seqLen_ffnDim,
+    .input_queue = @get_input_queue(6),
+    .simd_mode = .{ .simd_64 = true }
+});
+const left_matrix_shift_out_dsd_seqLen_ffnDim = @get_dsd(fabout_dsd, .{
+    .fabric_color = x_shift_send_color, .extent = _seqLen_ffnDim,
+    .output_queue = @get_output_queue(1),
+    .simd_mode = .{ .simd_64 = true }
+});
+
+const left_matrix_shift_re_in_dsd_seqLen_ffnDim = @get_dsd(fabin_dsd, .{
+    .fabric_color = x_shift_re_recv_color, .extent = _seqLen_ffnDim,
+    .input_queue = @get_input_queue(6),
+    .simd_mode = .{ .simd_64 = true }
+});
+const left_matrix_shift_re_out_dsd_seqLen_ffnDim = @get_dsd(fabout_dsd, .{
+    .fabric_color = x_shift_re_send_color, .extent = _seqLen_ffnDim,
+    .output_queue = @get_output_queue(1),
+    .simd_mode = .{ .simd_64 = true }
+});
+
+// DSR slots for shift (non-reverse direction, dsr 11-16; reverse direction, dsr 11-16 reused
+// since shift_reverse is compile-time: only one direction is ever initialized).
+const left_matrix_shift_out_dsr_seqLen_dim    = @get_dsr(dsr_dest, 11);
+const left_matrix_shift_in_dsr_seqLen_dim     = @get_dsr(dsr_src1, 11);
+
+const left_matrix_shift_out_dsr_seqLen_seqLen = @get_dsr(dsr_dest, 12);
+const left_matrix_shift_in_dsr_seqLen_seqLen  = @get_dsr(dsr_src1, 12);
+
+const left_matrix_shift_out_dsr_seqLen_ffnDim = @get_dsr(dsr_dest, 13);
+const left_matrix_shift_in_dsr_seqLen_ffnDim  = @get_dsr(dsr_src1, 13);
+
+// Runtime-selected shift size variable
+var shift_size: i16 = 0; // 0=seqLen_dim, 1=seqLen_seqLen, 2=seqLen_ffnDim
+
+fn left_matrix_shift(left_matrix_send_buffer_ptr: [*]f16, left_matrix_recv_buffer_ptr: [*]f16, dim_length: i16, step: i16) void {
+    if (step == 0) {
+        var _dim_length: i16 = (dim_length / 4) * 4;
+        left_matrix_send_dsd = @set_dsd_length(left_matrix_send_dsd, @bitcast(u16, _dim_length));
+        left_matrix_recv_dsd = @set_dsd_length(left_matrix_recv_dsd, @bitcast(u16, _dim_length));
+
+        if (_dim_length == _seqLen_dim) {
+            shift_size = 0;
+        } else if (_dim_length == _seqLen_seqLen) {
+            shift_size = 1;
+        } else if (_dim_length == _seqLen_ffnDim) {
+            shift_size = 2;
+        }
+    }
+
+    left_matrix_shift_impl(left_matrix_send_buffer_ptr, left_matrix_recv_buffer_ptr);
+}
+
+fn left_matrix_shift_impl(left_matrix_send_buffer_ptr: [*]f16, left_matrix_recv_buffer_ptr: [*]f16) void {
+
+    left_matrix_send_dsd = @set_dsd_base_addr(left_matrix_send_dsd, left_matrix_send_buffer_ptr);
+    left_matrix_recv_dsd = @set_dsd_base_addr(left_matrix_recv_dsd, left_matrix_recv_buffer_ptr);
+
+    @load_to_dsr(left_send_dsr, left_matrix_send_dsd);
+    @load_to_dsr(left_recv_dsr, left_matrix_recv_dsd);
+
+    if (shift_size == 0) {
+        @mov16(left_matrix_shift_out_dsr_seqLen_dim, left_send_dsr, .{.async=true, .unblock=left_matrix_shift_finish_id});
+        @mov16(left_recv_dsr, left_matrix_shift_in_dsr_seqLen_dim, .{.async=true, .activate=left_matrix_shift_finish_id});
+    } else if (shift_size == 1) {
+        @mov16(left_matrix_shift_out_dsr_seqLen_seqLen, left_send_dsr, .{.async=true, .unblock=left_matrix_shift_finish_id});
+        @mov16(left_recv_dsr, left_matrix_shift_in_dsr_seqLen_seqLen, .{.async=true, .activate=left_matrix_shift_finish_id});
+    } else {
+        @mov16(left_matrix_shift_out_dsr_seqLen_ffnDim, left_send_dsr, .{.async=true, .unblock=left_matrix_shift_finish_id});
+        @mov16(left_recv_dsr, left_matrix_shift_in_dsr_seqLen_ffnDim, .{.async=true, .activate=left_matrix_shift_finish_id});
+    }
+}
+
+// --------------------------------------------------------------------------
+// Comptime block 1: pre-load shift fabric DSDs into DSRs with .ut_id.
+// shift_reverse is a compile-time param, so only one branch is compiled.
+// ut1/ut2 are reused for shift (shift and two-hop do not overlap).
+// --------------------------------------------------------------------------
+comptime {
+    if (shift_reverse) {
+        @load_to_dsr(left_matrix_shift_out_dsr_seqLen_dim,    left_matrix_shift_re_out_dsd_seqLen_dim,    .{.async=true, .unblock=left_matrix_shift_finish_id, .ut_id = ut1});
+        @load_to_dsr(left_matrix_shift_in_dsr_seqLen_dim,     left_matrix_shift_re_in_dsd_seqLen_dim,     .{.async=true, .activate=left_matrix_shift_finish_id, .ut_id = ut2});
+        @load_to_dsr(left_matrix_shift_out_dsr_seqLen_seqLen, left_matrix_shift_re_out_dsd_seqLen_seqLen, .{.async=true, .unblock=left_matrix_shift_finish_id, .ut_id = ut1});
+        @load_to_dsr(left_matrix_shift_in_dsr_seqLen_seqLen,  left_matrix_shift_re_in_dsd_seqLen_seqLen,  .{.async=true, .activate=left_matrix_shift_finish_id, .ut_id = ut2});
+        @load_to_dsr(left_matrix_shift_out_dsr_seqLen_ffnDim, left_matrix_shift_re_out_dsd_seqLen_ffnDim, .{.async=true, .unblock=left_matrix_shift_finish_id, .ut_id = ut1});
+        @load_to_dsr(left_matrix_shift_in_dsr_seqLen_ffnDim,  left_matrix_shift_re_in_dsd_seqLen_ffnDim,  .{.async=true, .activate=left_matrix_shift_finish_id, .ut_id = ut2});
+    } else {
+        @load_to_dsr(left_matrix_shift_out_dsr_seqLen_dim,    left_matrix_shift_out_dsd_seqLen_dim,    .{.async=true, .unblock=left_matrix_shift_finish_id, .ut_id = ut1});
+        @load_to_dsr(left_matrix_shift_in_dsr_seqLen_dim,     left_matrix_shift_in_dsd_seqLen_dim,     .{.async=true, .activate=left_matrix_shift_finish_id, .ut_id = ut2});
+        @load_to_dsr(left_matrix_shift_out_dsr_seqLen_seqLen, left_matrix_shift_out_dsd_seqLen_seqLen, .{.async=true, .unblock=left_matrix_shift_finish_id, .ut_id = ut1});
+        @load_to_dsr(left_matrix_shift_in_dsr_seqLen_seqLen,  left_matrix_shift_in_dsd_seqLen_seqLen,  .{.async=true, .activate=left_matrix_shift_finish_id, .ut_id = ut2});
+        @load_to_dsr(left_matrix_shift_out_dsr_seqLen_ffnDim, left_matrix_shift_out_dsd_seqLen_ffnDim, .{.async=true, .unblock=left_matrix_shift_finish_id, .ut_id = ut1});
+        @load_to_dsr(left_matrix_shift_in_dsr_seqLen_ffnDim,  left_matrix_shift_in_dsd_seqLen_ffnDim,  .{.async=true, .activate=left_matrix_shift_finish_id, .ut_id = ut2});
+    }
+}
+
+// --------------------------------------------------------------------------
+// Comptime block 2: pre-load two-hop fabric DSDs into DSRs with .ut_id.
+// ut1/ut2 for x-axis (left), ut3/ut4 for y-axis (right).
+// Multiple DSR slots share the same ut_ids — safe because only one size is
+// active at a time; the ut_id just names the micro-task instruction slot.
+// --------------------------------------------------------------------------
+comptime {
+    // x-axis (left matrix) DSR pre-loads
+    @load_to_dsr(left_matrix_in_dsr_seqLen_dim,     left_matrix_in_dsd_seqLen_dim,     .{.async=true, .activate=left_matrix_finish_id, .ut_id = ut1});
+    @load_to_dsr(left_matrix_out_dsr_seqLen_dim,    left_matrix_out_dsd_seqLen_dim,    .{.async=true, .unblock=left_matrix_finish_id,  .ut_id = ut2});
+    @load_to_dsr(left_matrix_in_dsr_seqLen_seqLen,  left_matrix_in_dsd_seqLen_seqLen,  .{.async=true, .activate=left_matrix_finish_id, .ut_id = ut1});
+    @load_to_dsr(left_matrix_out_dsr_seqLen_seqLen, left_matrix_out_dsd_seqLen_seqLen, .{.async=true, .unblock=left_matrix_finish_id,  .ut_id = ut2});
+    @load_to_dsr(left_matrix_in_dsr_seqLen_ffnDim,  left_matrix_in_dsd_seqLen_ffnDim,  .{.async=true, .activate=left_matrix_finish_id, .ut_id = ut1});
+    @load_to_dsr(left_matrix_out_dsr_seqLen_ffnDim, left_matrix_out_dsd_seqLen_ffnDim, .{.async=true, .unblock=left_matrix_finish_id,  .ut_id = ut2});
+
+    // y-axis (right matrix) DSR pre-loads
+    @load_to_dsr(right_matrix_in_dsr_dim_dim,     right_matrix_in_dsd_dim_dim,     .{.async=true, .activate=right_matrix_finish_id, .ut_id = ut3});
+    @load_to_dsr(right_matrix_out_dsr_dim_dim,    right_matrix_out_dsd_dim_dim,    .{.async=true, .unblock=right_matrix_finish_id,  .ut_id = ut4});
+    @load_to_dsr(right_matrix_in_dsr_seqLen_dim,  right_matrix_in_dsd_seqLen_dim,  .{.async=true, .activate=right_matrix_finish_id, .ut_id = ut3});
+    @load_to_dsr(right_matrix_out_dsr_seqLen_dim, right_matrix_out_dsd_seqLen_dim, .{.async=true, .unblock=right_matrix_finish_id,  .ut_id = ut4});
+    @load_to_dsr(right_matrix_in_dsr_ffnDim_dim,  right_matrix_in_dsd_ffnDim_dim,  .{.async=true, .activate=right_matrix_finish_id, .ut_id = ut3});
+    @load_to_dsr(right_matrix_out_dsr_ffnDim_dim, right_matrix_out_dsd_ffnDim_dim, .{.async=true, .unblock=right_matrix_finish_id,  .ut_id = ut4});
+}
+
+// --------------------------------------------------------------------------
+// Final comptime: queue initialization and @block calls.
+// --------------------------------------------------------------------------
+comptime {
+    @block(allreduce_right_recv_qid);   // input_queue(4)
+    @block(allreduce_left_recv_qid);    // input_queue(5)
+    @block(bd_recv_qid);                // input_queue(3)
+    @block(@get_input_queue(2));        // x_recv_color
+    @block(@get_input_queue(6));        // x_shift recv
+    @block(@get_input_queue(7));        // y_recv_color
+
+    // Allreduce and broadcast DSDs.
+    @initialize_queue(allreduce_right_recv_qid, .{.color = c_right_recv});
+    @initialize_queue(allreduce_right_send_qid, .{.color = c_right_send});
+    @initialize_queue(allreduce_left_recv_qid,  .{.color = c_left_recv});
+    @initialize_queue(allreduce_left_send_qid,  .{.color = c_left_send});
+    @initialize_queue(bd_recv_qid,              .{.color = bd_recv_color});
+    @initialize_queue(left_bd_send_qid,         .{.color = left_bd_color});
+    @initialize_queue(right_bd_send_qid,        .{.color = right_bd_color});
+
+    // Two-hop matrix transfer (x and y axes).
+    @initialize_queue(@get_input_queue(2),  .{.color = x_recv_color});
+    @initialize_queue(@get_output_queue(3), .{.color = x_send_color});
+    @initialize_queue(@get_input_queue(7),  .{.color = y_recv_color});
+    @initialize_queue(@get_output_queue(2), .{.color = y_send_color});
+
+    // Shift DSDs share queue 6 (input) and queue 1 (output).
+    // shift_reverse param selects which direction is active at compile time.
+    if (shift_reverse) {
+        @initialize_queue(@get_input_queue(6),  .{.color = x_shift_re_recv_color});
+        @initialize_queue(@get_output_queue(1), .{.color = x_shift_re_send_color});
+    } else {
+        @initialize_queue(@get_input_queue(6),  .{.color = x_shift_recv_color});
+        @initialize_queue(@get_output_queue(1), .{.color = x_shift_send_color});
+    }
+
+    @bind_local_task(left_matrix_shift_finish, left_matrix_shift_finish_id);
+    @block(left_matrix_shift_finish_id);
+}

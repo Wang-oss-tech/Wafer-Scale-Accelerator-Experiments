@@ -1,0 +1,190 @@
+// 2.5D GEMM layout — Phase 1 (per-layer Cannon, host-side cross-layer reduce).
+//
+// Physical fabric: P_phys × P_phys.
+// Logical decomposition: c = sqrt_c * sqrt_c layers, each q × q  (q = P_phys / sqrt_c).
+//
+// Phase 1 hard-codes sqrt_c = 2  →  c = 4, P_phys = 2 * q.
+// Mosaic on the fabric (Option B block tiling):
+//     +-------+-------+
+//     |  L0   |  L1   |
+//     +-------+-------+
+//     |  L2   |  L3   |
+//     +-------+-------+
+// Coordinate derivation per PE:
+//     lz_x = px / q,  lz_y = py / q,  lz = lz_y * sqrt_c + lz_x
+//     lx   = px % q,  ly   = py % q
+//
+// Each layer runs a mini-MeshGEMM (Cannon-style bidirectional shift) on a q×q
+// sub-grid using K_layer = K_total / c.  After Phase 1 each PE's res_tile holds
+// only its layer's partial sum; the host computes the full C by summing the
+// four partials (one per layer) at the same (lx, ly).
+//
+// Color allocation (12 colors, reused across all 4 layers):
+//   1..3   X_0, X_1, X_2                : two-hop x-comm (Cannon)
+//   4..6   Y_0, Y_1, Y_2                : two-hop y-comm
+//   7..9   X_shift_re_0, _1, _2         : pre-shift reverse
+//  12..14  X_shift_0, X_shift_1, X_shift_2: pre-shift forward  (skips 10,11 to
+//                                          avoid local_task_id collisions)
+//
+// Layer boundaries (lx == 0 || lx == q-1, ly == 0 || ly == q-1) are handled
+// inside comm_layout_25d.csl — boundary PEs in each layer terminate routes at
+// RAMP, so wavelets never cross between layers on these colors.
+//
+// Phase 2 will add 4 more colors for cross-layer butterfly reduction.
+
+param P_phys: i16;       // physical fabric side (= sqrt_c * q)
+param sqrt_c: i16;       // sqrt of the number of layers (Phase 1: must == 2)
+param q: i16;            // intra-layer side (= P_phys / sqrt_c)
+param Mt: i16;
+param Kt_layer: i16;     // K_total / c per-PE K-extent
+param Nt: i16;
+
+const X_0: color = @get_color(1);
+const X_1: color = @get_color(2);
+const X_2: color = @get_color(3);
+
+const Y_0: color = @get_color(4);
+const Y_1: color = @get_color(5);
+const Y_2: color = @get_color(6);
+
+const X_shift_re_0: color = @get_color(7);
+const X_shift_re_1: color = @get_color(8);
+const X_shift_re_2: color = @get_color(9);
+
+const X_shift_0: color = @get_color(12);
+const X_shift_1: color = @get_color(13);
+const X_shift_2: color = @get_color(16);
+
+// Reduction colors (Phase 2, used after Cannon completes).
+// Routes are NOT set statically — each PE reconfigures them per reduction substep
+// using <tile_config>.color_config.reset_routes (same pattern as summa_manual_multicasting).
+const red_x: color = @get_color(19);
+const red_y: color = @get_color(20);
+
+const memcpy = @import_module("<memcpy/get_params>", .{
+    .width  = P_phys,
+    .height = P_phys,
+});
+
+const comm = @import_module("comm_lib/comm_layout_25d.csl", .{
+    .q = q,
+    .x_interleave          = [3]color{X_0, X_1, X_2},
+    .x_shift_interleave    = [3]color{X_shift_0, X_shift_1, X_shift_2},
+    .x_shift_re_interleave = [3]color{X_shift_re_0, X_shift_re_1, X_shift_re_2},
+    .y_interleave          = [3]color{Y_0, Y_1, Y_2},
+});
+
+layout {
+    @set_rectangle(P_phys, P_phys);
+
+    var px: i16 = 0;
+    var py: i16 = 0;
+
+    while (px < P_phys) : (px += 1) {
+        const memcpy_params = memcpy.get_params(px);
+
+        py = 0;
+        while (py < P_phys) : (py += 1) {
+
+            // Layer-local coordinates: identical math for every layer because
+            // the layer mosaic is a regular sqrt_c × sqrt_c tiling of q×q blocks.
+            const lx: i16 = px % q;
+            const ly: i16 = py % q;
+            const lz_x: i16 = px / q;
+            const lz_y: i16 = py / q;
+            const lz: i16 = lz_y * sqrt_c + lz_x;
+
+            const comm_params = comm.get_params(lx, ly);
+
+            @set_tile_code(px, py, "meshgemm_25d.csl", .{
+                .memcpy_params = memcpy_params,
+                .comm_params   = comm_params,
+                .P_phys = P_phys, .sqrt_c = sqrt_c, .q = q,
+                .Mt = Mt, .Kt_layer = Kt_layer, .Nt = Nt,
+                .lx = lx, .ly = ly, .lz_x = lz_x, .lz_y = lz_y, .lz = lz,
+                .red_x = red_x, .red_y = red_y,
+            });
+
+            // ----- X-axis routes (keyed on layer-local lx, NOT physical px) -----
+            {
+                if (lx == 0) {
+                    // Left edge of the layer — only one neighbor (east-in-layer).
+                    @set_color_config(px, py, comm_params.x_recv_color,        .{ .routes = .{ .rx = .{EAST}, .tx = .{RAMP} } });
+                    @set_color_config(px, py, comm_params.x_send_color,        .{ .routes = .{ .rx = .{RAMP}, .tx = .{EAST} } });
+                    @set_color_config(px, py, comm_params.x_shift_recv_color,  .{ .routes = .{ .rx = .{EAST}, .tx = .{RAMP} } });
+                    @set_color_config(px, py, comm_params.x_shift_send_color,  .{ .routes = .{ .rx = .{RAMP}, .tx = .{EAST} } });
+                    @set_color_config(px, py, comm_params.x_shift_re_recv_color,.{ .routes = .{ .rx = .{EAST}, .tx = .{RAMP} } });
+                    @set_color_config(px, py, comm_params.x_shift_re_send_color,.{ .routes = .{ .rx = .{RAMP}, .tx = .{EAST} } });
+                } else if (lx == q - 1) {
+                    // Right edge of the layer — only one neighbor (west-in-layer).
+                    @set_color_config(px, py, comm_params.x_recv_color,        .{ .routes = .{ .rx = .{WEST}, .tx = .{RAMP} } });
+                    @set_color_config(px, py, comm_params.x_send_color,        .{ .routes = .{ .rx = .{RAMP}, .tx = .{WEST} } });
+                    @set_color_config(px, py, comm_params.x_shift_recv_color,  .{ .routes = .{ .rx = .{WEST}, .tx = .{RAMP} } });
+                    @set_color_config(px, py, comm_params.x_shift_send_color,  .{ .routes = .{ .rx = .{RAMP}, .tx = .{WEST} } });
+                    @set_color_config(px, py, comm_params.x_shift_re_recv_color,.{ .routes = .{ .rx = .{WEST}, .tx = .{RAMP} } });
+                    @set_color_config(px, py, comm_params.x_shift_re_send_color,.{ .routes = .{ .rx = .{RAMP}, .tx = .{WEST} } });
+                } else {
+                    if (lx % 2 == 0) {
+                        @set_color_config(px, py, comm_params.x_recv_color,        .{ .routes = .{ .rx = .{WEST}, .tx = .{RAMP} } });
+                        @set_color_config(px, py, comm_params.x_send_color,        .{ .routes = .{ .rx = .{RAMP}, .tx = .{EAST} } });
+                        @set_color_config(px, py, comm_params.x_tran_color,        .{ .routes = .{ .rx = .{EAST}, .tx = .{WEST} } });
+
+                        @set_color_config(px, py, comm_params.x_shift_recv_color,  .{ .routes = .{ .rx = .{WEST}, .tx = .{RAMP} } });
+                        @set_color_config(px, py, comm_params.x_shift_send_color,  .{ .routes = .{ .rx = .{RAMP}, .tx = .{EAST} } });
+                        @set_color_config(px, py, comm_params.x_shift_tran_color,  .{ .routes = .{ .rx = .{EAST}, .tx = .{WEST} } });
+
+                        @set_color_config(px, py, comm_params.x_shift_re_recv_color,.{ .routes = .{ .rx = .{EAST}, .tx = .{RAMP} } });
+                        @set_color_config(px, py, comm_params.x_shift_re_send_color,.{ .routes = .{ .rx = .{RAMP}, .tx = .{WEST} } });
+                        @set_color_config(px, py, comm_params.x_shift_re_tran_color,.{ .routes = .{ .rx = .{WEST}, .tx = .{EAST} } });
+                    } else {
+                        @set_color_config(px, py, comm_params.x_recv_color,        .{ .routes = .{ .rx = .{EAST}, .tx = .{RAMP} } });
+                        @set_color_config(px, py, comm_params.x_send_color,        .{ .routes = .{ .rx = .{RAMP}, .tx = .{WEST} } });
+                        @set_color_config(px, py, comm_params.x_tran_color,        .{ .routes = .{ .rx = .{WEST}, .tx = .{EAST} } });
+
+                        @set_color_config(px, py, comm_params.x_shift_recv_color,  .{ .routes = .{ .rx = .{EAST}, .tx = .{RAMP} } });
+                        @set_color_config(px, py, comm_params.x_shift_send_color,  .{ .routes = .{ .rx = .{RAMP}, .tx = .{WEST} } });
+                        @set_color_config(px, py, comm_params.x_shift_tran_color,  .{ .routes = .{ .rx = .{WEST}, .tx = .{EAST} } });
+
+                        @set_color_config(px, py, comm_params.x_shift_re_recv_color,.{ .routes = .{ .rx = .{WEST}, .tx = .{RAMP} } });
+                        @set_color_config(px, py, comm_params.x_shift_re_send_color,.{ .routes = .{ .rx = .{RAMP}, .tx = .{EAST} } });
+                        @set_color_config(px, py, comm_params.x_shift_re_tran_color,.{ .routes = .{ .rx = .{EAST}, .tx = .{WEST} } });
+                    }
+                }
+
+                // ----- Y-axis routes (keyed on layer-local ly) -----
+                if (ly == 0) {
+                    @set_color_config(px, py, comm_params.y_recv_color, .{ .routes = .{ .rx = .{SOUTH}, .tx = .{RAMP} } });
+                    @set_color_config(px, py, comm_params.y_send_color, .{ .routes = .{ .rx = .{RAMP}, .tx = .{SOUTH} } });
+                } else if (ly == q - 1) {
+                    @set_color_config(px, py, comm_params.y_recv_color, .{ .routes = .{ .rx = .{NORTH}, .tx = .{RAMP} } });
+                    @set_color_config(px, py, comm_params.y_send_color, .{ .routes = .{ .rx = .{RAMP}, .tx = .{NORTH} } });
+                } else {
+                    if (ly % 2 == 0) {
+                        @set_color_config(px, py, comm_params.y_recv_color, .{ .routes = .{ .rx = .{NORTH}, .tx = .{RAMP} } });
+                        @set_color_config(px, py, comm_params.y_send_color, .{ .routes = .{ .rx = .{RAMP}, .tx = .{SOUTH} } });
+                        @set_color_config(px, py, comm_params.y_tran_color, .{ .routes = .{ .rx = .{SOUTH}, .tx = .{NORTH} } });
+                    } else {
+                        @set_color_config(px, py, comm_params.y_recv_color, .{ .routes = .{ .rx = .{SOUTH}, .tx = .{RAMP} } });
+                        @set_color_config(px, py, comm_params.y_send_color, .{ .routes = .{ .rx = .{RAMP}, .tx = .{NORTH} } });
+                        @set_color_config(px, py, comm_params.y_tran_color, .{ .routes = .{ .rx = .{NORTH}, .tx = .{SOUTH} } });
+                    }
+                }
+
+            }
+        }
+    }
+
+    @export_name("X",   [*]f16, true);
+    @export_name("W",   [*]f16, true);
+    @export_name("res", [*]f16, true);
+
+    @export_name("init_task",     fn()void);
+    @export_name("meshgemm_entry",fn()void);
+    @export_name("meshgemm_host", fn(i16, i16)void);
+
+    @export_name("time_memcpy", [*]f32, true);
+    @export_name("time_ref",    [*]f32, true);
+
+    @export_name("f_memcpy_timestamps",  fn()void);
+    @export_name("f_reference_timestamps", fn()void);
+}

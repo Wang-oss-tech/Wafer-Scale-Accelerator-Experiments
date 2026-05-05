@@ -1,0 +1,521 @@
+// 2.5D mini-MeshGEMM PE program — Phase 1 (per-layer Cannon, no device reduce).
+//
+// Each PE is part of a q × q layer (one of c = sqrt_c^2 layers).  It holds:
+//   X_tile : [Mt * Kt_layer]f16   (a slice of A spanning the layer's K-slab)
+//   W_tile : [Kt_layer * Nt]f16   (a slice of B spanning the layer's K-slab)
+//   res_tile: [Mt * Nt]f16        (partial C for this layer)
+//
+// Algorithm (within a single layer):
+//   1. Pre-shift A within the row of the layer (Cannon initialization), using
+//      the bidirectional shift in comm_pe.csl.  This is q/2 shift batches that
+//      end with the canonical Cannon initial alignment.
+//   2. Run q Cannon steps: each step shifts A west and B north by one position
+//      inside the q×q layer, then performs a local outer-product GEMM.
+//
+// All comm primitives operate on layer-local coordinates because comm_layout_25d
+// configured boundary routes at lx == 0 / lx == q-1 / ly == 0 / ly == q-1.
+//
+// Phase 1: res_tile is the LAYER-PARTIAL C.  The host sums the c partials
+// from same-(lx, ly) PEs across layers to obtain the full C.
+
+// ---------------------- Input Parameters --------------------- //
+param memcpy_params: comptime_struct;
+param comm_params: comptime_struct;
+
+param P_phys: i16;
+param sqrt_c: i16;
+param q: i16;
+param Mt: i16;
+param Kt_layer: i16;
+param Nt: i16;
+
+// Layer-local coordinates passed in from layout.csl.
+param lx:   i16;
+param ly:   i16;
+param lz_x: i16;
+param lz_y: i16;
+param lz:   i16;
+
+// Reduction colors (Phase 2).  Routes are configured at runtime.
+param red_x: color;
+param red_y: color;
+
+// ---------------------- Input Matrix ------------------------ //
+
+var X_0_tile: [Mt*Kt_layer]f16 = @zeros([Mt*Kt_layer]f16);
+var X_1_tile: [Mt*Kt_layer]f16 = @zeros([Mt*Kt_layer]f16);
+var ptr_X: [*]f16 = &X_0_tile;
+var X_dsd = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt} -> X_0_tile[i] });
+
+var W_0_tile: [Kt_layer*Nt]f16 = @zeros([Kt_layer*Nt]f16);
+var W_1_tile: [Kt_layer*Nt]f16 = @zeros([Kt_layer*Nt]f16);
+var ptr_W: [*]f16 = &W_0_tile;
+var W_dsd = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Nt} -> W_0_tile[i] });
+
+// ---------------------- Output Matrix ----------------------- //
+
+var res_tile: [Mt*Nt]f16 = @zeros([Mt*Nt]f16);
+var ptr_res: [*]f16 = &res_tile;
+var res_dsd = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt*Nt} -> res_tile[i] });
+
+// ---------------------- Phase 2: Reduction Buffers ----------- //
+// C_save: snapshot of res_tile at the start of an axis reduction.
+// C_recv: per-substep recv buffer for the broadcast tile.
+var C_save: [Mt*Nt]f16 = @zeros([Mt*Nt]f16);
+var C_recv: [Mt*Nt]f16 = @zeros([Mt*Nt]f16);
+
+// Physical PE coordinates (used for runtime tile_config decisions).
+var px_glob: i16 = 0;
+var py_glob: i16 = 0;
+
+// ---------------------- Modules ------------------------------ //
+
+const sys_mod = @import_module("<memcpy/memcpy>", memcpy_params);
+const layout_module = @import_module("<layout>");
+const tile_config = @import_module("<tile_config>");
+const color_config = tile_config.color_config;
+
+// comm_pe.csl is generic — we forward q as P and Kt_layer as Kt so its
+// per-PE DSD extents (Mt*Kt and Kt*Nt) are sized for the layer slab.
+const comm_mod = @import_module("comm_lib/comm_pe.csl", @concat_structs(comm_params, .{
+    .P = q, .Mt = Mt, .Kt = Kt_layer, .Nt = Nt,
+    .x_finish_id = x_finish_id,
+    .y_finish_id = y_finish_id,
+    .left_matrix_shift_callback = left_matrix_shift_callback,
+}));
+
+// ---------------------- Local Variables ---------------------- //
+
+const jumpcast_finish_id: local_task_id = @get_local_task_id(23);
+const x_finish_id: local_task_id = @get_local_task_id(24);
+const y_finish_id: local_task_id = @get_local_task_id(25);
+const next_step_id: local_task_id = @get_local_task_id(26);
+
+// Phase 2 reduction tasks. Cannon uses 22-26; memcpy reserves 21, 27-29 etc.
+// Valid range is [8, 31). Use 8, 9.
+const red_x_done_id: local_task_id = @get_local_task_id(8);
+const red_y_done_id: local_task_id = @get_local_task_id(9);
+
+// Phase 2 reduction queues / DSRs (kept disjoint from comm_pe's queues 2-5
+// and memcpy's queues 0-1).
+const red_x_oq: output_queue = @get_output_queue(6);
+const red_x_iq: input_queue  = @get_input_queue(6);
+const red_y_oq: output_queue = @get_output_queue(7);
+const red_y_iq: input_queue  = @get_input_queue(7);
+
+var x_shift_step: i16 = 0;
+var x_shift_reverse: bool = false;
+
+var swap_ptr: [*]f16 = &X_0_tile;
+var ptr_X_send: [*]f16 = &X_0_tile;
+var ptr_X_recv: [*]f16 = &X_1_tile;
+var ptr_W_send: [*]f16 = &W_0_tile;
+var ptr_W_recv: [*]f16 = &W_1_tile;
+
+var out_dsd = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt} -> res_tile[i] });
+var ptr_out: [*]f16 = &res_tile;
+
+const out_dest_dsr = @get_dsr(dsr_dest, 1);
+const out_src0_dsr = @get_dsr(dsr_src0, 1);
+const X_src1_dsr = @get_dsr(dsr_src1, 1);
+
+// ---------------------- Phase 2: Reduction DSDs -------------- //
+const fab_red_x_out = @get_dsd(fabout_dsd, .{
+    .extent = Mt * Nt, .fabric_color = red_x,
+    .output_queue = red_x_oq,
+});
+const fab_red_x_in = @get_dsd(fabin_dsd, .{
+    .extent = Mt * Nt, .fabric_color = red_x,
+    .input_queue = red_x_iq,
+});
+const fab_red_y_out = @get_dsd(fabout_dsd, .{
+    .extent = Mt * Nt, .fabric_color = red_y,
+    .output_queue = red_y_oq,
+});
+const fab_red_y_in = @get_dsd(fabin_dsd, .{
+    .extent = Mt * Nt, .fabric_color = red_y,
+    .input_queue = red_y_iq,
+});
+
+var mem_C_save = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt*Nt} -> C_save[i] });
+var mem_C_recv = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt*Nt} -> C_recv[i] });
+var mem_res_full = @get_dsd(mem1d_dsd, .{ .tensor_access = |i|{Mt*Nt} -> res_tile[i] });
+
+// ---------------------- Phase 2: Reduction state ------------- //
+// red_step counts substeps within an axis: 0..q-1.
+// Per substep, the lz_x == 1 (or lz_y == 1) PE at the matching intra-layer
+// index broadcasts to its lz_x == 0 (lz_y == 0) partner.
+var red_step: i16 = 0;
+
+// ------------------------- Timer ------------------------- //
+
+const timestamp = @import_module("<time>");
+var tscStartBuffer = @zeros([timestamp.tsc_size_words]u16);
+var tscEndBuffer   = @zeros([timestamp.tsc_size_words]u16);
+
+var time_buf_f32 = @zeros([3]f32);
+var ptr_time_memcpy: [*]f32 = &time_buf_f32;
+
+var tscRefBuffer = @zeros([timestamp.tsc_size_words]u16);
+var time_ref_f32 = @zeros([2]f32);
+var ptr_time_ref: [*]f32 = &time_ref_f32;
+
+
+fn init_task() void {
+    timestamp.enable_tsc();
+
+    // Capture physical coords for runtime tile_config decisions.
+    px_glob = @as(i16, layout_module.get_x_coord());
+    py_glob = @as(i16, layout_module.get_y_coord());
+
+    // Cannon's pre-shift on row ly inside this layer: bidirectional alternating
+    // by parity of ly to balance west/east traffic.
+    if (ly % 2 == 0) {
+        x_shift_step = ly / 2;
+        x_shift_reverse = true;
+    } else {
+        x_shift_step = (ly + 1) / 2;
+        x_shift_reverse = false;
+    }
+
+    comm_mod.init_(lx, ly);
+    sys_mod.unblock_cmd_stream();
+}
+
+task x_finish() void {
+    @block(x_finish_id);
+    @unblock(jumpcast_finish_id);
+}
+
+task y_finish() void {
+    @block(y_finish_id);
+    @activate(jumpcast_finish_id);
+}
+
+task jumpcast_finish() void {
+    @block(jumpcast_finish_id);
+    @unblock(next_step_id);
+}
+
+task next_step() void {
+    @block(next_step_id);
+    mm_compute();
+}
+
+fn gemv_static_step_X(curW: f16) void {
+    @fmach(out_dest_dsr, out_src0_dsr, X_src1_dsr, curW);
+}
+
+fn mm_compute() void {
+
+    swap_ptr = ptr_X_send;
+    ptr_X_send = ptr_X_recv;
+    ptr_X_recv = swap_ptr;
+
+    swap_ptr = ptr_W_send;
+    ptr_W_send = ptr_W_recv;
+    ptr_W_recv = swap_ptr;
+
+    if (step < q) {
+
+        comm_mod.two_hop_comm(ptr_X_send, ptr_W_send, ptr_X_recv, ptr_W_recv);
+
+        X_dsd = @set_dsd_base_addr(X_dsd, ptr_X_send);
+        W_dsd = @set_dsd_base_addr(W_dsd, ptr_W_send);
+
+        X_dsd = @set_dsd_length(X_dsd, @bitcast(u16, Mt));
+        W_dsd = @set_dsd_length(W_dsd, @bitcast(u16, Nt));
+
+        for (@range(i16, Kt_layer)) |k| {
+
+            out_dsd = @set_dsd_base_addr(out_dsd, ptr_out);
+
+            @load_to_dsr(out_dest_dsr, out_dsd, .{ .save_address = true });
+            @load_to_dsr(out_src0_dsr, out_dsd, .{ .save_address = true });
+            @load_to_dsr(X_src1_dsr, X_dsd, .{ .save_address = false });
+            @map(gemv_static_step_X, W_dsd);
+
+            X_dsd = @increment_dsd_offset(X_dsd, Mt, f16);
+            W_dsd = @increment_dsd_offset(W_dsd, Nt, f16);
+        }
+
+        step += 1;
+        @activate(next_step_id);
+
+    } else {
+        step = 0;
+        start_x_reduction();
+    }
+}
+
+// ============================================================================
+// Phase 2: Cross-layer reduce-to-layer-0 (sqrt_c == 2 only)
+// ============================================================================
+// Canonical 2.5D reduction: sum the c per-layer partials INTO layer 0; layers
+// 1..c-1 retain stale data after this phase (host reads only layer 0 via D2H).
+//
+// X-axis: q substeps. Source PE (lx=red_step, lz_x=1) broadcasts C_save along
+// its row; partner (lx=red_step, lz_x=0) accumulates into res_tile.
+// Y-axis: q substeps. Same pattern with (ly, lz_y) instead.
+
+fn copy_res_to_csave() void {
+    @fmovh(mem_C_save, mem_res_full);
+}
+
+fn accumulate_recv_into_res() void {
+    @faddh(mem_res_full, mem_res_full, mem_C_recv);
+}
+
+fn configure_red_x_broadcast(root_px: i16) void {
+    if (px_glob == root_px) {
+        if (root_px == 0) {
+            color_config.reset_routes(red_x, .{ .rx = RAMP, .tx = EAST });
+        } else if (root_px == P_phys - 1) {
+            color_config.reset_routes(red_x, .{ .rx = RAMP, .tx = WEST });
+        } else {
+            color_config.reset_routes(red_x, .{ .rx = RAMP, .tx = [2]direction{EAST, WEST} });
+        }
+    } else if (px_glob < root_px) {
+        if (px_glob == 0) {
+            color_config.reset_routes(red_x, .{ .rx = EAST, .tx = RAMP });
+        } else {
+            color_config.reset_routes(red_x, .{ .rx = EAST, .tx = [2]direction{RAMP, WEST} });
+        }
+    } else {
+        if (px_glob == P_phys - 1) {
+            color_config.reset_routes(red_x, .{ .rx = WEST, .tx = RAMP });
+        } else {
+            color_config.reset_routes(red_x, .{ .rx = WEST, .tx = [2]direction{RAMP, EAST} });
+        }
+    }
+}
+
+fn configure_red_y_broadcast(root_py: i16) void {
+    if (py_glob == root_py) {
+        if (root_py == 0) {
+            color_config.reset_routes(red_y, .{ .rx = RAMP, .tx = SOUTH });
+        } else if (root_py == P_phys - 1) {
+            color_config.reset_routes(red_y, .{ .rx = RAMP, .tx = NORTH });
+        } else {
+            color_config.reset_routes(red_y, .{ .rx = RAMP, .tx = [2]direction{SOUTH, NORTH} });
+        }
+    } else if (py_glob < root_py) {
+        if (py_glob == 0) {
+            color_config.reset_routes(red_y, .{ .rx = SOUTH, .tx = RAMP });
+        } else {
+            color_config.reset_routes(red_y, .{ .rx = SOUTH, .tx = [2]direction{RAMP, NORTH} });
+        }
+    } else {
+        if (py_glob == P_phys - 1) {
+            color_config.reset_routes(red_y, .{ .rx = NORTH, .tx = RAMP });
+        } else {
+            color_config.reset_routes(red_y, .{ .rx = NORTH, .tx = [2]direction{RAMP, SOUTH} });
+        }
+    }
+}
+
+fn start_x_reduction() void {
+    copy_res_to_csave();
+    red_step = 0;
+    do_red_x_substep();
+}
+
+fn do_red_x_substep() void {
+    const root_px: i16 = q + red_step;
+    configure_red_x_broadcast(root_px);
+    if (px_glob == root_px) {
+        @fmovh(fab_red_x_out, mem_C_save, .{ .async = true, .activate = red_x_done_id });
+    } else {
+        @fmovh(mem_C_recv, fab_red_x_in, .{ .async = true, .activate = red_x_done_id });
+    }
+}
+
+task red_x_done() void {
+    if (lx == red_step and lz_x == 0) {
+        accumulate_recv_into_res();
+    }
+    red_step += 1;
+    if (red_step < q) {
+        do_red_x_substep();
+    } else {
+        copy_res_to_csave();
+        red_step = 0;
+        do_red_y_substep();
+    }
+}
+
+fn do_red_y_substep() void {
+    const root_py: i16 = q + red_step;
+    configure_red_y_broadcast(root_py);
+    if (py_glob == root_py) {
+        @fmovh(fab_red_y_out, mem_C_save, .{ .async = true, .activate = red_y_done_id });
+    } else {
+        @fmovh(mem_C_recv, fab_red_y_in, .{ .async = true, .activate = red_y_done_id });
+    }
+}
+
+task red_y_done() void {
+    if (ly == red_step and lz_y == 0) {
+        accumulate_recv_into_res();
+    }
+    red_step += 1;
+    if (red_step < q) {
+        do_red_y_substep();
+    } else {
+        meshgemm_entry();
+    }
+}
+
+// ---------------------- Entry Point ------------------------- //
+
+var total_repeat_times: i16 = 1;
+var total_warmup_times: i16 = 0;
+
+var repeat_times: i16 = 0;
+var step: i16 = 0;
+
+fn meshgemm_host(total_warmup_times_: i16, total_repeat_times_: i16) void {
+    total_repeat_times = total_repeat_times_;
+    total_warmup_times = total_warmup_times_;
+
+    repeat_times = 0;
+    step = 0;
+
+    meshgemm_entry();
+}
+
+fn meshgemm_entry() void {
+
+    if (repeat_times == total_repeat_times + total_warmup_times) {
+        exit();
+    } else {
+        if (repeat_times == total_warmup_times) {
+            timestamp.get_timestamp(&tscRefBuffer);
+            timestamp.get_timestamp(&tscStartBuffer);
+        }
+
+        repeat_times += 1;
+
+        ptr_X_send = &X_1_tile;
+        ptr_X_recv = &X_0_tile;
+
+        left_matrix_shift_callback();
+    }
+}
+
+fn left_matrix_shift_callback() void {
+    // Pre-shift batch step counter ranges over [0, q/2). After q/2 batches, A
+    // is in canonical Cannon initial alignment for the layer.
+    if (step < @as(i16, q / 2)) {
+
+        if (x_shift_step >= 0) {
+            x_shift_step -= 1;
+
+            swap_ptr = ptr_X_send;
+            ptr_X_send = ptr_X_recv;
+            ptr_X_recv = swap_ptr;
+        }
+
+        step += 1;
+
+        if (x_shift_reverse) {
+            comm_mod.left_matrix_shift_reverse(ptr_X_send, ptr_X_recv);
+        } else {
+            comm_mod.left_matrix_shift(ptr_X_send, ptr_X_recv);
+        }
+    } else {
+        if (x_shift_step != 0) {
+            swap_ptr = ptr_X_send;
+            ptr_X_send = ptr_X_recv;
+            ptr_X_recv = swap_ptr;
+        }
+
+        step = 0;
+        @fmovh(res_dsd, 0.0);
+
+        ptr_W_send = &W_1_tile;
+        ptr_W_recv = &W_0_tile;
+
+        out_dsd = @set_dsd_base_addr(out_dsd, ptr_out);
+        ptr_out = &res_tile;
+
+        mm_compute();
+    }
+}
+
+fn exit() void {
+    timestamp.get_timestamp(&tscEndBuffer);
+    timestamp.disable_tsc();
+
+    f_reference_timestamps();
+    f_memcpy_timestamps();
+    sys_mod.unblock_cmd_stream();
+}
+
+fn f_memcpy_timestamps() void {
+    var lo_ : u16 = 0;
+    var hi_ : u16 = 0;
+
+    lo_ = tscStartBuffer[0];
+    hi_ = tscStartBuffer[1];
+    time_buf_f32[0] = @bitcast(f32, (@as(u32,hi_) << @as(u16,16)) | @as(u32, lo_) );
+
+    lo_ = tscStartBuffer[2];
+    hi_ = tscEndBuffer[0];
+    time_buf_f32[1] = @bitcast(f32, (@as(u32,hi_) << @as(u16,16)) | @as(u32, lo_) );
+
+    lo_ = tscEndBuffer[1];
+    hi_ = tscEndBuffer[2];
+    time_buf_f32[2] = @bitcast(f32, (@as(u32,hi_) << @as(u16,16)) | @as(u32, lo_) );
+}
+
+fn f_reference_timestamps() void {
+    var lo_ : u16 = 0;
+    var hi_ : u16 = 0;
+
+    lo_ = tscRefBuffer[0];
+    hi_ = tscRefBuffer[1];
+    time_ref_f32[0] = @bitcast(f32, (@as(u32,hi_) << @as(u16,16)) | @as(u32, lo_) );
+
+    lo_ = tscRefBuffer[2];
+    hi_ = 0;
+    time_ref_f32[1] = @bitcast(f32, (@as(u32,hi_) << @as(u16,16)) | @as(u32, lo_) );
+}
+
+comptime {
+    @export_symbol(ptr_time_memcpy, "time_memcpy");
+    @export_symbol(ptr_time_ref,    "time_ref");
+}
+
+comptime {
+    @bind_local_task(x_finish,        x_finish_id);
+    @bind_local_task(y_finish,        y_finish_id);
+    @bind_local_task(jumpcast_finish, jumpcast_finish_id);
+    @bind_local_task(next_step,       next_step_id);
+
+    @block(x_finish_id);
+    @block(y_finish_id);
+    @block(jumpcast_finish_id);
+    @block(next_step_id);
+
+    // Phase 2 reduction tasks (fired by async DSD .activate, no comptime @block).
+    @bind_local_task(red_x_done, red_x_done_id);
+    @bind_local_task(red_y_done, red_y_done_id);
+
+    @initialize_queue(red_x_oq, .{ .color = red_x });
+    @initialize_queue(red_x_iq, .{ .color = red_x });
+    @initialize_queue(red_y_oq, .{ .color = red_y });
+    @initialize_queue(red_y_iq, .{ .color = red_y });
+    @block(red_x_iq);
+    @block(red_y_iq);
+}
+
+comptime {
+    @export_symbol(ptr_X,  "X");
+    @export_symbol(ptr_W,  "W");
+    @export_symbol(ptr_res, "res");
+
+    @export_symbol(init_task);
+    @export_symbol(meshgemm_entry);
+    @export_symbol(meshgemm_host);
+}

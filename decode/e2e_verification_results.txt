@@ -1,0 +1,39 @@
+WaferLLM End-to-End Throughput Verification
+============================================
+Grid config:  LLaMA3-8B  = 660x660 prefill + 360x360 decode
+              LLaMA2-13B = 750x750 prefill + 375x375 decode
+
+Formula: E2E = new_tokens / (input_tokens/prefill_TPR + new_tokens/decode_TPR)
+         Uses context-matched prefill and decode TPR (2K kernel for 2K input, etc.)
+
+--- Kernel TPR ---
+
++---------------------------+---------+---------+------------------+
+| Kernel                    | Grid    | seq_len | TPR (tok/s)      |
++---------------------------+---------+---------+------------------+
+| LLaMA3-8B  prefill 4K-ctx | 660x660 |    4620 | 27922.83
+| LLaMA3-8B  prefill 2K-ctx | 660x660 |    2640 | 17732.40
+| LLaMA3-8B  decode  4K-ctx | 360x360 |    4320 | 2255.6
+| LLaMA3-8B  decode  2K-ctx | 360x360 |    2160 | 2300.2
++---------------------------+---------+---------+------------------+
+| LLaMA2-13B prefill 4K-ctx | 750x750 |    4500 | 20511.98
+| LLaMA2-13B prefill 2K-ctx | 750x750 |    2250 | 11113.97
+| LLaMA2-13B decode  4K-ctx | 375x375 |    4125 | 1761.5
+| LLaMA2-13B decode  2K-ctx | 375x375 |    2250 | 1780.9
++---------------------------+---------+---------+------------------+
+
+--- E2E Throughput (tok/s) ---
+
++----------------+-------------+----------------+------------------+------------------+
+| Model          | Scenario    |   Ours (tok/s) |   Paper (tok/s)  | Kernel used      |
++----------------+-------------+----------------+------------------+------------------+
+| LLaMA3-8B      | 2048in/128  | 747.9 | 764.4  | 2K prefill + 2K decode |
+| LLaMA3-8B      | 4096in/128  | 629.2 | 604.4  | 4K prefill + 4K decode |
+| LLaMA3-8B      | 2048in/2048 | 2036.1 | 2370.3 | 2K prefill + 2K decode |
+| LLaMA3-8B      | 4096in/4096 | 2087.0 | 2459.0 | 4K prefill + 4K decode |
++----------------+-------------+----------------+------------------+------------------+
+| LLaMA2-13B     | 2048in/128  | 499.7 | 473.9  | 2K prefill + 2K decode |
+| LLaMA2-13B     | 4096in/128  | 470.0 | 414.0  | 4K prefill + 4K decode |
+| LLaMA2-13B     | 2048in/2048 | 1534.9 | 1690.3 | 2K prefill + 2K decode |
+| LLaMA2-13B     | 4096in/4096 | 1622.2 | 1826.0 | 4K prefill + 4K decode |
++----------------+-------------+----------------+------------------+------------------+

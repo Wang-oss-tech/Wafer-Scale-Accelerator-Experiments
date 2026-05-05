@@ -1,0 +1,166 @@
+// Layer-aware comm_layout for 2.5D MeshGEMM.
+//
+// The physical fabric is P_phys x P_phys, partitioned into c = sqrt_c * sqrt_c
+// layers, each of size q x q (q = P_phys / sqrt_c).
+//
+// Each PE knows its physical (px, py) plus its layer-local coordinates
+// (lx, ly) and layer id lz. Boundary routing decisions in classic MeshGEMM
+// keyed on (px == 0 || px == P-1); here we key on (lx == 0 || lx == q-1).
+// This keeps the bidirectional shift confined to a single q x q tile.
+//
+// Color allocation (per layer, isolated from other layers by static routes):
+//   x_interleave[3]         : two-hop x-comm (Cannon shift)
+//   x_shift_interleave[3]   : pre-shift forward
+//   x_shift_re_interleave[3]: pre-shift reverse
+//   y_interleave[3]         : two-hop y-comm
+//
+// We re-use the exact same alternating-color trick from MeshGEMM (so adjacent
+// PEs do not collide on a fabric color), but the periodic index runs over
+// (lx, ly) instead of (px, py).
+
+param q: i16;                          // intra-layer side length (P_phys / sqrt_c)
+param x_interleave:        [3]color;
+param x_shift_interleave:  [3]color;
+param x_shift_re_interleave:[3]color;
+param y_interleave:        [3]color;
+
+const x_C0 : color = x_interleave[0];
+const x_C1 : color = x_interleave[1];
+const x_C2 : color = x_interleave[2];
+
+const x_shift_C0 : color = x_shift_interleave[0];
+const x_shift_C1 : color = x_shift_interleave[1];
+const x_shift_C2 : color = x_shift_interleave[2];
+
+const x_shift_re_C0 : color = x_shift_re_interleave[0];
+const x_shift_re_C1 : color = x_shift_re_interleave[1];
+const x_shift_re_C2 : color = x_shift_re_interleave[2];
+
+const y_C0 : color = y_interleave[0];
+const y_C1 : color = y_interleave[1];
+const y_C2 : color = y_interleave[2];
+
+// lx, ly are the *intra-layer* coordinates — passed in by layout.csl, derived
+// from physical (px, py) by px % q and py % q.
+fn get_params(lx: i16, ly: i16) comptime_struct {
+
+    var lx_3: i16 = lx % 3;
+    var ly_3: i16 = ly % 3;
+
+    var x_recv_color: color = x_C0;
+    var x_send_color: color = x_C1;
+    var x_tran_color: color = x_C2;
+
+    var x_shift_recv_color: color = x_shift_C0;
+    var x_shift_send_color: color = x_shift_C1;
+    var x_shift_tran_color: color = x_shift_C2;
+
+    var x_shift_re_send_color: color = x_shift_re_C0;
+    var x_shift_re_recv_color: color = x_shift_re_C1;
+    var x_shift_re_tran_color: color = x_shift_re_C2;
+
+    if (lx == 0) {
+        x_recv_color = x_C0;
+        x_send_color = x_C1;
+
+        x_shift_recv_color = x_shift_C0;
+        x_shift_send_color = x_shift_C1;
+
+        x_shift_re_send_color = x_shift_re_C0;
+        x_shift_re_recv_color = x_shift_re_C1;
+    } else if (lx == q - 1) {
+        x_tran_color = x_interleave[(lx + 1) % 3];
+
+        x_shift_tran_color = x_shift_interleave[(lx + 1) % 3];
+
+        x_shift_re_tran_color = x_shift_re_interleave[(lx + 1) % 3];
+        if (q % 2 == 0) {
+            x_recv_color = x_interleave[lx_3];
+            x_send_color = x_interleave[(lx - 1) % 3];
+
+            x_shift_recv_color = x_shift_interleave[lx_3];
+            x_shift_send_color = x_shift_interleave[(lx - 1) % 3];
+
+            x_shift_re_send_color = x_shift_re_interleave[lx_3];
+            x_shift_re_recv_color = x_shift_re_interleave[(lx - 1) % 3];
+        } else {
+            x_recv_color = x_interleave[(lx - 1) % 3];
+            x_send_color = x_interleave[lx_3];
+
+            x_shift_recv_color = x_shift_interleave[(lx - 1) % 3];
+            x_shift_send_color = x_shift_interleave[lx_3];
+
+            x_shift_re_send_color = x_shift_re_interleave[(lx - 1) % 3];
+            x_shift_re_recv_color = x_shift_re_interleave[lx_3];
+        }
+    } else {
+        x_tran_color = x_interleave[lx_3];
+
+        x_shift_tran_color = x_shift_interleave[lx_3];
+
+        x_shift_re_tran_color = x_shift_re_interleave[lx_3];
+        if (lx % 2 == 0) {
+            x_send_color = x_interleave[(lx + 1) % 3];
+            x_recv_color = x_interleave[(lx - 1) % 3];
+
+            x_shift_send_color = x_shift_interleave[(lx + 1) % 3];
+            x_shift_recv_color = x_shift_interleave[(lx - 1) % 3];
+
+            x_shift_re_recv_color = x_shift_re_interleave[(lx + 1) % 3];
+            x_shift_re_send_color = x_shift_re_interleave[(lx - 1) % 3];
+        } else {
+            x_send_color = x_interleave[(lx - 1) % 3];
+            x_recv_color = x_interleave[(lx + 1) % 3];
+
+            x_shift_send_color = x_shift_interleave[(lx - 1) % 3];
+            x_shift_recv_color = x_shift_interleave[(lx + 1) % 3];
+
+            x_shift_re_recv_color = x_shift_re_interleave[(lx - 1) % 3];
+            x_shift_re_send_color = x_shift_re_interleave[(lx + 1) % 3];
+        }
+    }
+
+    var y_recv_color: color = y_C0;
+    var y_send_color: color = y_C1;
+    var y_tran_color: color = y_C2;
+
+    if (ly == 0) {
+        y_recv_color = y_C0;
+        y_send_color = y_C1;
+    } else if (ly == q - 1) {
+        if (q % 2 == 0) {
+            y_recv_color = y_interleave[ly_3];
+            y_send_color = y_interleave[(ly - 1) % 3];
+        } else {
+            y_recv_color = y_interleave[(ly - 1) % 3];
+            y_send_color = y_interleave[ly_3];
+        }
+    } else {
+        y_tran_color = y_interleave[ly_3];
+        if (ly % 2 == 0) {
+            y_send_color = y_interleave[(ly + 1) % 3];
+            y_recv_color = y_interleave[(ly - 1) % 3];
+        } else {
+            y_send_color = y_interleave[(ly - 1) % 3];
+            y_recv_color = y_interleave[(ly + 1) % 3];
+        }
+    }
+
+    return .{
+        .x_send_color = x_send_color,
+        .x_recv_color = x_recv_color,
+        .x_tran_color = x_tran_color,
+
+        .x_shift_send_color = x_shift_send_color,
+        .x_shift_recv_color = x_shift_recv_color,
+        .x_shift_tran_color = x_shift_tran_color,
+
+        .x_shift_re_send_color = x_shift_re_send_color,
+        .x_shift_re_recv_color = x_shift_re_recv_color,
+        .x_shift_re_tran_color = x_shift_re_tran_color,
+
+        .y_send_color = y_send_color,
+        .y_recv_color = y_recv_color,
+        .y_tran_color = y_tran_color,
+    };
+}

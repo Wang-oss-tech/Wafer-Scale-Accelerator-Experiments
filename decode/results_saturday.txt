@@ -1,0 +1,7 @@
+Decode TPR Results (tok/s)
+==========================
+Model            P=420                    P=540                    P=660
+Llama3-8B        2087.2     1844.6     FAILED
+Llama2-13B       1644.0    1456.1    FAILED
+CodeLlama-34B    1243.0   1140.8   FAILED
+QWen2-72B        725.0     675.9     FAILED
