@@ -4,17 +4,22 @@
 # via the if/else around `python compile.py` and the TPR-parse fallback.
 set +e
 
-export HTTPS_PROXY=http://proxy.alcf.anl.gov:3128
-export https_proxy=http://proxy.alcf.anl.gov:3128
-# Bypass the proxy for internal Cerebras cluster IPs.
-# proxy.alcf.anl.gov:3128 has a ~15-min timeout that kills gRPC for large P
-# (P=660 decode, P=720 prefill). SDK worker IPs are in 10.0.0.0/8 and 100.64.0.0/10.
-export no_proxy="10.,100.64.,localhost,127.0.0.1,.alcf.anl.gov"
-export NO_PROXY="$no_proxy"
-source ~/R_2.9.0/venv_cerebras_pt/bin/activate
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
+
+# Set proxy for pip install (PyPI fetch needs ALCF proxy on this cluster).
+export HTTPS_PROXY=http://proxy.alcf.anl.gov:3128
+export https_proxy=http://proxy.alcf.anl.gov:3128
+
+python3.8 -m venv sdk_venv
+source sdk_venv/bin/activate
+pip install --upgrade pip
+pip install cerebras_appliance==2.5.0
+pip install cerebras_sdk==2.5.0
+
+# Unset proxy BEFORE running the kernel: gRPC to the appliance must connect
+# directly (the ALCF proxy times out ~15min and kills large-P compiles).
+unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy
 
 exec > >(tee "$SCRIPT_DIR/results_term_out.txt") 2>&1
 
@@ -35,6 +40,12 @@ run_one() {
     local seq_len=$(jq -r '.seq_len' "$config")
     local ffn_dim=$(jq -r '.ffn_dim' "$config")
     local layer_num=$(jq -r '.layer_num' "$config")
+    # input_tokens is the ACTUAL prompt length (e.g. 4096); seq_len in the
+    # JSON is padded up to a multiple of P for kernel tile distribution.
+    # TPR is reported against the actual prompt length the user provides,
+    # NOT the padded kernel sequence (which would overstate throughput).
+    # Falls back to seq_len if input_tokens is missing from the config.
+    local input_tokens=$(jq -r '.input_tokens // .seq_len' "$config")
 
     echo ""
     echo "=========================================="
@@ -52,11 +63,12 @@ run_one() {
         echo "$output"
 
         # Prefill run.py prints "Time: X ms" for one layer (averaged over repeats).
-        # Full-model TPR = seq_len / (time_ms * 1e-3 * layer_num)
+        # Full-model TPR = input_tokens / (time_ms * 1e-3 * layer_num)
+        # Uses the ACTUAL input length (e.g. 4096), not the padded seq_len.
         local time_ms
         time_ms=$(echo "$output" | grep -E "^Time:" | grep -oE '[0-9]+(\.[0-9]+)?' | head -1)
         if [ -n "$time_ms" ]; then
-            tpr=$(python3 -c "print(f'{$seq_len / ($time_ms * 1e-3 * $layer_num):.1f}')")
+            tpr=$(python3 -c "print(f'{$input_tokens / ($time_ms * 1e-3 * $layer_num):.1f}')")
             TPR["$label"]="$tpr"
             echo ">>> $label time/layer: ${time_ms} ms,  TPR: $tpr tok/s"
         else

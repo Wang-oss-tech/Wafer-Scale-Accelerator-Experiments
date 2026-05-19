@@ -16,6 +16,10 @@ def parse_args():
     parser.add_argument("--n_kv_heads", default=1,     type=int,  help="Number of KV heads (default 1)")
     parser.add_argument("--warmup",     default=5,     type=int,  help="Warmup runs (default 5)")
     parser.add_argument("--repeats",    default=50,    type=int,  help="Timed runs (default 50)")
+    parser.add_argument("--input_tokens", default=0,   type=int,
+                        help="Actual prompt length (0 = same as seq_len, no test). "
+                             "If < seq_len, runs the kernel twice with different padding "
+                             "and asserts real-output invariance (causal-mask check).")
     parser.add_argument("--simulator",  action="store_true",      help="Run on simulator")
     return parser.parse_args()
 
@@ -44,6 +48,7 @@ with SdkLauncher(artifact_id, simulator=args.simulator, disable_version_check=Tr
         f" --n_kv_heads {args.n_kv_heads}"
         f" --warmup {args.warmup}"
         f" --repeats {args.repeats}"
+        f" --input_tokens {args.input_tokens}"
     )
 
     if args.simulator:

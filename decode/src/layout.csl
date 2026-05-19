@@ -22,6 +22,7 @@ param pes_p_kv_head: i16;
 param head_dim_p_pe: i16;
 param seq_len_p_pe: i16;
 param ffn_dim_p_pe: i16;
+param valid_kv: i16;  // actual KV cache size, mask threshold for padding KV slots
 
 param pe_num_p_group: i16;
 param root_1st_phase: i16;
@@ -86,6 +87,8 @@ layout {
                 .pe_num_p_group = pe_num_p_group,
                 .root_1st_phase = root_1st_phase,
                 .root_2nd_phase = root_2nd_phase,
+
+                .valid_kv = valid_kv,
             });
         }
     }

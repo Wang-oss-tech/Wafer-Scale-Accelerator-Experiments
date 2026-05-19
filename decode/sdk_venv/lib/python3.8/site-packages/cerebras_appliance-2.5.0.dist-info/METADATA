@@ -1,0 +1,54 @@
+Metadata-Version: 2.1
+Name: cerebras-appliance
+Version: 2.5.0
+Summary: Base client for Cerebras Wafer Scale Cluster
+Home-page: https://cerebras.net/
+Author: Cerebras Systems
+Author-email: support@cerebras.net
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Science/Research
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Classifier: Topic :: Software Development
+Classifier: Topic :: Software Development :: Libraries
+Classifier: Topic :: System :: Hardware
+Classifier: License :: OSI Approved :: BSD License
+Classifier: Programming Language :: Python :: 3
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: pip (>=21.1.2)
+Requires-Dist: numpy (==1.24.4)
+Requires-Dist: protobuf (==3.15.6)
+Requires-Dist: grpcio (==1.47.0)
+Requires-Dist: grpcio-tools (==1.47.0)
+Requires-Dist: dill
+Requires-Dist: h5py (==3.10.0)
+Requires-Dist: hdf5plugin
+Requires-Dist: PyJWT
+Requires-Dist: tblib (==1.7.0)
+Requires-Dist: tqdm (>=4.42.1)
+Requires-Dist: psutil (>=5.8.0)
+Requires-Dist: urllib3 (<2)
+Requires-Dist: packaging
+Requires-Dist: pyyaml
+Requires-Dist: zstandard
+
+# cerebras_appliance
+
+[![PyPI Version](https://img.shields.io/pypi/v/cerebras_apliance)](https://pypi.org/project/cerebras_apliance/)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/cerebras_apliance)](https://pypi.org/project/cerebras_apliance/)
+[![Discord](https://img.shields.io/discord/1085960591052644463)](https://discord.gg/ZqvYS2e2rY)
+[![PyPI - Downloads](https://img.shields.io/pypi/dm/cerebras_apliance)](https://pypi.org/project/cerebras_apliance/#files)
+
+cerebras_appliance package is a set of framework-agnostic utilities required by Cerebras's Wafer-Scale cluster software stack which offers a framework to train and evaluate a neural network with near-perfect linear scaling across millions of cores without the inconvenience of distributed computing.
+
+* **Website**: https://cerebras.net/
+* **Documentation**: https://docs.cerebras.net/
+* **Support**: support@cerebras.net
+* **Discord**: https://discord.gg/ZqvYS2e2rY
+
+## Installation
+
+```bash
+pip install cerebras_appliance
+```

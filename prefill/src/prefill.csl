@@ -662,6 +662,32 @@ fn score_matmul() void {
     matmul_T_compute();
 }
 
+// Causal-attention mask. PE (px, py) owns score block covering:
+//   global query rows: [py*seq_len_p_pe, (py+1)*seq_len_p_pe)
+//   global key cols:   [px*seq_len_p_pe, (px+1)*seq_len_p_pe)
+// Score(i, j) must be masked where j > i (key in the future of query).
+// Apply AFTER alpha multiply, BEFORE max-reduce, so masked entries are -inf-
+// like, the all-reduce max picks the legitimate global max, and exp on the
+// masked entries underflows to 0.
+const NEG_INF: f16 = -65500.0;
+fn apply_causal_mask() void {
+    if (px > py) {
+        // Entire block is strict-upper-triangle of full score matrix → mask all.
+        @load_to_dsr(comp_dest_dsr_1, score_dsd);
+        @fmovh(comp_dest_dsr_1, NEG_INF);
+    } else if (px == py) {
+        // Diagonal block: mask strictly above the local diagonal (j > i).
+        for (@range(i16, seq_len_p_pe)) |i| {
+            for (@range(i16, seq_len_p_pe)) |j| {
+                if (j > i) {
+                    score[i * seq_len_p_pe + j] = NEG_INF;
+                }
+            }
+        }
+    }
+    // else px < py: strict-lower-triangle block — no masking needed.
+}
+
 fn softmax_score() void {
 
     seqLen_dsd_1 = @set_dsd_base_addr(seqLen_dsd_1, ptr_score);
@@ -669,6 +695,8 @@ fn softmax_score() void {
     @load_to_dsr(comp_dest_dsr_1, score_dsd);
     @load_to_dsr(comp_src0_dsr_1, score_dsd);
     @fmulh(comp_dest_dsr_1, comp_src0_dsr_1, alpha);
+
+    apply_causal_mask();
 
     @load_to_dsr(comp_dest_dsr_1, local_max_dsd, .{ .save_address = false});
     @fmovh(comp_dest_dsr_1, 0.0); // Clearing
@@ -1128,6 +1156,7 @@ comptime {
 
 comptime {
     @export_symbol(ptr_X, "X");
+    @export_symbol(ptr_Z, "Z");
     @export_symbol(ptr_W, "W");
     @export_symbol(ptr_Q_weight, "Q_weight");
     @export_symbol(ptr_K_weight, "K_weight");

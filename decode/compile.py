@@ -16,6 +16,11 @@ seq_len    = int(sys.argv[7])
 ffn_dim    = int(sys.argv[8])
 group_num  = int(sys.argv[9])
 simulator  = sys.argv[10].lower() == "true"
+# valid_kv: actual KV cache size (e.g. 4096). Score entries for keys >= valid_kv
+# are masked to -inf in softmax so the new-token output is invariant to the
+# padding KV slots beyond the real cache. Optional 11th arg; defaults to seq_len
+# (i.e. no masking, kernel runs as before).
+valid_kv   = int(sys.argv[11]) if len(sys.argv) > 11 else seq_len
 
 dim_p_pe       = dim // P
 pes_p_head     = P // n_heads
@@ -38,7 +43,8 @@ params = (
     f"head_dim_p_pe:{head_dim_p_pe},"
     f"seq_len_p_pe:{seq_len_p_pe},ffn_dim_p_pe:{ffn_dim_p_pe},"
     f"pe_num_p_group:{pe_num_p_group},"
-    f"root_1st_phase:{root_1st_phase},root_2nd_phase:{root_2nd_phase}"
+    f"root_1st_phase:{root_1st_phase},root_2nd_phase:{root_2nd_phase},"
+    f"valid_kv:{valid_kv}"
 )
 
 if simulator:

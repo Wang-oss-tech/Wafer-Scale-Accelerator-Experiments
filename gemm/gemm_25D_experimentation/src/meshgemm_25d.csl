@@ -10,7 +10,7 @@
 //      the bidirectional shift in comm_pe.csl.  This is q/2 shift batches that
 //      end with the canonical Cannon initial alignment.
 //   2. Run q Cannon steps: each step shifts A west and B north by one position
-//      inside the q×q layer, then performs a local outer-product GEMM.
+//      inside the q×q layer, then performs a local outer-product GEMM. 
 //
 // All comm primitives operate on layer-local coordinates because comm_layout_25d
 // configured boundary routes at lx == 0 / lx == q-1 / ly == 0 / ly == q-1.

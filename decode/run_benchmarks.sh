@@ -3,19 +3,24 @@
 # even if individual ones fail. Per-config failures are captured in run_one()
 # via the if/else around `python compile.py` and the TPR-parse fallback, which
 # both write TPR["$label"]="FAILED" so the final results table stays well-formed.
-set +e
-
-export HTTPS_PROXY=http://proxy.alcf.anl.gov:3128
-export https_proxy=http://proxy.alcf.anl.gov:3128
-source ~/R_2.9.0/venv_cerebras_pt/bin/activate
-
-# Unset proxy after venv activation so gRPC (compile + launch) connects
-# directly to the cluster instead of routing through the ALCF proxy,
-# which times out ~15 min and kills P=660 compiles (~20 min).
-unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy
+# set +e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
+
+# Set proxy for pip install (PyPI fetch needs ALCF proxy on this cluster).
+export HTTPS_PROXY=http://proxy.alcf.anl.gov:3128
+export https_proxy=http://proxy.alcf.anl.gov:3128
+
+python3.8 -m venv sdk_venv
+source sdk_venv/bin/activate
+pip install --upgrade pip
+pip install cerebras_appliance==2.5.0
+pip install cerebras_sdk==2.5.0
+
+# Unset proxy BEFORE running: gRPC to the appliance must connect directly
+# (the ALCF proxy times out ~15min and kills large-P compiles).
+unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy
 
 exec > >(tee "$SCRIPT_DIR/results_term_out.txt") 2>&1
 
@@ -37,12 +42,16 @@ run_one() {
     local ffn_dim=$(jq -r '.ffn_dim' "$config")
     local group_num=$(jq -r '.group_num' "$config")
     local layer_num=$(jq -r '.layer_num' "$config")
+    # valid_kv: actual KV cache size (e.g. 4096). Score entries past this index
+    # are masked in softmax so the new-token output reflects only real KV.
+    # Falls back to seq_len (no masking) if not set.
+    local valid_kv=$(jq -r '.valid_kv // .seq_len' "$config")
 
     echo ""
     echo "=========================================="
-    echo "Compiling: $label (P=$P dim=$dim ffn=$ffn_dim layer_num=$layer_num)"
+    echo "Compiling: $label (P=$P dim=$dim seq_len=$seq_len valid_kv=$valid_kv ffn=$ffn_dim layer_num=$layer_num)"
     echo "=========================================="
-    if python compile.py "$P" "$bsz" "$dim" "$n_heads" "$n_kv_heads" "$head_dim" "$seq_len" "$ffn_dim" "$group_num" false; then
+    if python compile.py "$P" "$bsz" "$dim" "$n_heads" "$n_kv_heads" "$head_dim" "$seq_len" "$ffn_dim" "$group_num" false "$valid_kv"; then
         echo "Launching: $label"
         output=$(python appliance_launch.py \
             --P "$P" --bsz "$bsz" --dim "$dim" --seq_len "$seq_len" --ffn_dim "$ffn_dim" \

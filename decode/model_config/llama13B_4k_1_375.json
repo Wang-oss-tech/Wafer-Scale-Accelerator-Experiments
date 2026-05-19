@@ -1,5 +1,13 @@
 {
-    "P": 375, "group_num": 15, "bsz": 1,
-    "dim": 5250, "n_heads": 1, "n_kv_heads": 1, "head_dim": 5250,
-    "seq_len": 4125, "ffn_dim": 13875, "layer_num": 40
+  "P": 375,
+  "group_num": 15,
+  "bsz": 1,
+  "dim": 5250,
+  "n_heads": 1,
+  "n_kv_heads": 1,
+  "head_dim": 5250,
+  "seq_len": 4125,
+  "ffn_dim": 13875,
+  "layer_num": 40,
+  "valid_kv": 4096
 }

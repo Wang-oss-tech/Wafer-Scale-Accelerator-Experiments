@@ -20,6 +20,13 @@ param pe_num_p_group: i16;
 param root_1st_phase: i16;
 param root_2nd_phase: i16;
 
+// Actual KV-cache size (= number of real tokens in the cache, e.g. 4096).
+// Padded kernel seq_len ≥ valid_kv. Score entries for keys >= valid_kv are
+// masked to -inf in softmax so the new token's output is invariant to the
+// padding KV slots.  If valid_kv >= P*seq_len_p_pe (full kernel size),
+// no entries are masked (the kernel runs fully, exactly as before).
+param valid_kv: i16;
+
 const trace = @import_module(
   "<debug>",
   .{ .key = "debug_main",
@@ -570,7 +577,41 @@ fn score_matvec_mult() void {
     @fmulh(dest_dsr_1, src0_dsr_1, alpha);
 }
 
+// KV-padding mask. Each PE owns score entries for keys at global positions
+// [py*seq_len_p_pe, (py+1)*seq_len_p_pe). Mask entries where global_key >=
+// valid_kv (i.e., the slot is past the real KV cache, just padding).
+//
+// Three cases per PE based on its py block vs valid_kv:
+//   block_start >= valid_kv          → entire block is padding, mask all
+//   block_start + seq_len_p_pe > valid_kv → partial overlap, mask suffix
+//   else                              → fully valid, no mask
+//
+// Math: -inf scores produce 0 weight after softmax, so V slots at masked
+// positions contribute 0 to the output → real tokens (1 per call) get the
+// answer they would for a kernel sized exactly to valid_kv.
+const NEG_INF_DEC: f16 = -65500.0;
+fn apply_kv_padding_mask() void {
+    const block_start: i16 = py * seq_len_p_pe;
+    if (block_start >= valid_kv) {
+        // Entire block past valid range — mask all entries.
+        @load_to_dsr(dest_dsr_1, score_dsd);
+        @fmovh(dest_dsr_1, NEG_INF_DEC);
+    } else if (block_start + seq_len_p_pe > valid_kv) {
+        // Partial overlap: mask the suffix.
+        for (@range(i16, bsz)) |b| {
+            for (@range(i16, seq_len_p_pe)) |j| {
+                if (block_start + j >= valid_kv) {
+                    score[b * seq_len_p_pe + j] = NEG_INF_DEC;
+                }
+            }
+        }
+    }
+    // else: fully valid block, no masking needed.
+}
+
 fn softmax_score() void {
+
+    apply_kv_padding_mask();
 
     seq_len_p_pe_dsd_1 = @set_dsd_base_addr(seq_len_p_pe_dsd_1, ptr_score);
     @load_to_dsr(src1_dsr_1, seq_len_p_pe_dsd_1, .{ .save_address = true });

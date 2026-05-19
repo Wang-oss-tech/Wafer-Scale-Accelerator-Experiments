@@ -64,7 +64,10 @@
       "Bash(xargs -I{} sh -c 'echo \"=== {} ===\"; cat {}')",
       "Read(//home/william_wang_yale/R_2.6.0/csl-examples/experiments/prefill/**)",
       "Read(//home/william_wang_yale/R_2.6.0/csl-examples/experiments/decode/**)",
-      "Bash(pip install *)"
+      "Bash(pip install *)",
+      "Bash(git -C /home/william_wang_yale/R_2.6.0/csl-examples/experiments log --oneline -3)",
+      "Bash(git -C /home/william_wang_yale/R_2.6.0/csl-examples/experiments show HEAD:gemm/.claude/settings.local.json)",
+      "Bash(python compile.py 480 4320 4320 14400 1 1 4320 false)"
     ]
   }
 }

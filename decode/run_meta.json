@@ -1449,6 +1449,438 @@
                 }
             },
             "coordinator_ip_port": "10.125.8.134:9000"
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-qviwxaxprepz6e72nzywgy",
+            "workflow_id": "wflow-tl3qcqkk5jedtovxzavndlxtky",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-qviwxaxprepz6e72nzywgy",
+            "start_time": "2026-05-06T04:09:15Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse001-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-d5m4n7enmlrc4extkyzy47",
+            "workflow_id": "wflow-mtltwgnbhrh2nh4cyvygxb5fiq",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-d5m4n7enmlrc4extkyzy47",
+            "start_time": "2026-05-06T04:21:07Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse001-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-bsf3sg6dn6up6h2oakgw6g",
+            "workflow_id": "wflow-i7sudvgdrrcofkcxu34dvl56ce",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-bsf3sg6dn6up6h2oakgw6g",
+            "start_time": "2026-05-06T04:40:19Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse001-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-pldecechoaeivnfjjwqgua",
+            "workflow_id": "wflow-y7h46pifozgtjmjxarqsudafli",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-pldecechoaeivnfjjwqgua",
+            "start_time": "2026-05-06T04:51:20Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse001-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-7wrdfaxndzcy5rpduxn5rj",
+            "workflow_id": "wflow-7awe4bwwu5hq5f5kqcswalg2va",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-7wrdfaxndzcy5rpduxn5rj",
+            "start_time": "2026-05-06T05:10:12Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse001-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-mvggmwxy3oyqkfrznhsxaz",
+            "workflow_id": "wflow-ftppi5ditjfuxieitfpg262kiy",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-mvggmwxy3oyqkfrznhsxaz",
+            "start_time": "2026-05-06T05:11:02Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse001-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-hm4mckrhypspbmyqvuwff8",
+            "workflow_id": "wflow-dsumoqtrinf7lbylmynjyazuai",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-hm4mckrhypspbmyqvuwff8",
+            "start_time": "2026-05-06T05:22:03Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse001-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-cxg2lak9stkxhhs4agdwpo",
+            "workflow_id": "wflow-agbyqoeq2ngxhho6ttwu3ubmhi",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-cxg2lak9stkxhhs4agdwpo",
+            "start_time": "2026-05-06T05:41:15Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse001-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-rdyzusx2arvtdayexgf4sd",
+            "workflow_id": "wflow-euxqddayf5fghas3bdddlmgxgy",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-rdyzusx2arvtdayexgf4sd",
+            "start_time": "2026-05-06T06:15:59Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse001-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-wtj98jcbfq2svlmzgtq9hb",
+            "workflow_id": "wflow-esqsedihz5aepky4mk3z65a2cq",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-wtj98jcbfq2svlmzgtq9hb",
+            "start_time": "2026-05-06T06:28:10Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse001-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-qav6wnuyvn3wc3dtrbpf6f",
+            "workflow_id": "wflow-3mdvm5qs7nek7dmreskwdgq3bm",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-qav6wnuyvn3wc3dtrbpf6f",
+            "start_time": "2026-05-06T06:31:20Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse001-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-5iihbapzlg3qa8vpy6iess",
+            "workflow_id": "wflow-ja33vgkstrdhdnqfbenaorhpzi",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-5iihbapzlg3qa8vpy6iess",
+            "start_time": "2026-05-06T06:42:52Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse001-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-wszd6zdjegqhdmuks73n6d",
+            "workflow_id": "wflow-zfuqruzaobdkfmj6b5ow2zcaze",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-wszd6zdjegqhdmuks73n6d",
+            "start_time": "2026-05-06T06:46:13Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse001-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-mpqhet8wbg7vhvermfty9n",
+            "workflow_id": "wflow-dckkb7akxbgutj4jymw447rd5q",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-mpqhet8wbg7vhvermfty9n",
+            "start_time": "2026-05-06T07:14:25Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse001-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-gapxhkxpav38shhohvfyit",
+            "workflow_id": "wflow-gcod3lbbunannflr7zcrxmarqi",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-gapxhkxpav38shhohvfyit",
+            "start_time": "2026-05-06T07:27:07Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse001-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-hsg5t4ct99ufa9jovkpygp",
+            "workflow_id": "wflow-dqrxqsfr4naq7feqqbgrerdpeu",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-hsg5t4ct99ufa9jovkpygp",
+            "start_time": "2026-05-06T07:45:29Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse001-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                },
+                "cer-anl-wse002-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
         }
     ],
     "execute_jobs": [
@@ -2240,6 +2672,294 @@
             "scheduled_time": "2026-04-27T23:28:37Z",
             "software_versions": {
                 "appliance-client": "2.9.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-pf9mqbgzszc6y2adgkvve3",
+            "workflow_id": "wflow-non5e6prjngwllmqjxc63zfefa",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-pf9mqbgzszc6y2adgkvve3",
+            "start_time": "2026-05-06T04:18:16Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-2dxuvppqi7s43sjcsqhbxu",
+            "workflow_id": "wflow-gbvoukxhxrduzmf4ra6s6uasu4",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-2dxuvppqi7s43sjcsqhbxu",
+            "start_time": "2026-05-06T04:37:18Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-ij6ipxcse28nyh8utqjsli",
+            "workflow_id": "wflow-2ykrlbdkdnf3thje42ryoay4oy",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-ij6ipxcse28nyh8utqjsli",
+            "start_time": "2026-05-06T05:06:41Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-4vrmd6rqu6xbbacva5gh3p",
+            "workflow_id": "wflow-33kvh4wzp5e3vjvnspthfbmhjq",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-4vrmd6rqu6xbbacva5gh3p",
+            "start_time": "2026-05-06T05:08:12Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-xlhwmelyyopuy3k3zzxspf",
+            "workflow_id": "wflow-up5wlbslwjfj3cixgq7fvnwasq",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-xlhwmelyyopuy3k3zzxspf",
+            "start_time": "2026-05-06T05:19:13Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-ylvnqe2fdqeprpnbjvk9t6",
+            "workflow_id": "wflow-urwpt74hbndn3mbvkwluf3c6qe",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-ylvnqe2fdqeprpnbjvk9t6",
+            "start_time": "2026-05-06T05:26:14Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-k43mjbz8kwojocx9wkeir4",
+            "workflow_id": "wflow-7bjracipmbelhkirrk2cejm77q",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-k43mjbz8kwojocx9wkeir4",
+            "start_time": "2026-05-06T05:37:25Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-8zisdyx9zxj9a2j4aum9hs",
+            "workflow_id": "wflow-p5widnrapnc6tciagdltubi62y",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-8zisdyx9zxj9a2j4aum9hs",
+            "start_time": "2026-05-06T06:10:48Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-gerrcwsc2xzvmqp55aszfb",
+            "workflow_id": "wflow-vpc3335gkjdt3lopluj45drloq",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-gerrcwsc2xzvmqp55aszfb",
+            "start_time": "2026-05-06T06:25:10Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-b2vsxsbqcscdbkagygjtuj",
+            "workflow_id": "wflow-wewsjchn7nhmlblz6tgqjsiz5e",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-b2vsxsbqcscdbkagygjtuj",
+            "start_time": "2026-05-06T06:40:11Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-dbeqkewanv5aakqitt6czx",
+            "workflow_id": "wflow-njfyiaygezbnddnemdrntd4qda",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-dbeqkewanv5aakqitt6czx",
+            "start_time": "2026-05-06T06:42:32Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-avliqpcyhx6jmb5ecu7fhd",
+            "workflow_id": "wflow-bxvkfusnj5axne2tvuefgamk4i",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-avliqpcyhx6jmb5ecu7fhd",
+            "start_time": "2026-05-06T06:50:23Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-3xkmjf9ruuzuivtashyafb",
+            "workflow_id": "wflow-cajpryks2vhpbiwa3p5o3gh2we",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-3xkmjf9ruuzuivtashyafb",
+            "start_time": "2026-05-06T07:10:24Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-rtcwxundschalhppjb3hfj",
+            "workflow_id": "wflow-s5oh7zikqrenpmbsafonedrmqq",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-rtcwxundschalhppjb3hfj",
+            "start_time": "2026-05-06T07:24:06Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy01": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-rfnyz7sijdmldbx4zfhjjz",
+            "workflow_id": "wflow-zrvtrwoedjaatko2avbotek2qy",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-rfnyz7sijdmldbx4zfhjjz",
+            "start_time": "2026-05-06T07:41:38Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
+                "cbcore": "2.9.0-202512242343-6-e2e12a41",
+                "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
+                "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"
+            },
+            "system_versions": {
+                "cer-anl-wse001-cs-sy02": {
+                    "execmode": "WEIGHT_STREAMING"
+                }
+            }
+        },
+        {
+            "namespace": "job-operator",
+            "id": "wsjob-59evuhjgn2ng637zhfqre7",
+            "workflow_id": "wflow-rz4jw3yfvbfktmvxu5vpadrfju",
+            "log_path": "/n1/wsjob/workdir/job-operator/wsjob-59evuhjgn2ng637zhfqre7",
+            "start_time": "2026-05-06T08:06:41Z",
+            "software_versions": {
+                "appliance-client": "2.5.0",
                 "cbcore": "2.9.0-202512242343-6-e2e12a41",
                 "cluster-server": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab",
                 "job-operator": "3.1.0-202511212135-400-1f941dc2+1f941dc2ab"

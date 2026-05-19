@@ -15,13 +15,23 @@
 
 set +e
 
-export HTTPS_PROXY=http://proxy.alcf.anl.gov:3128
-export https_proxy=http://proxy.alcf.anl.gov:3128
-source ~/R_2.9.0/venv_cerebras_pt/bin/activate
-unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy
-
 DECODE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PREFILL_DIR="$(cd "$DECODE_DIR/../prefill" && pwd)"
+cd "$DECODE_DIR"
+
+# Set proxy for pip install (PyPI fetch needs ALCF proxy on this cluster).
+export HTTPS_PROXY=http://proxy.alcf.anl.gov:3128
+export https_proxy=http://proxy.alcf.anl.gov:3128
+
+python3.8 -m venv sdk_venv
+source sdk_venv/bin/activate
+pip install --upgrade pip
+pip install cerebras_appliance==2.5.0
+pip install cerebras_sdk==2.5.0
+
+# Unset proxy BEFORE running: gRPC to the appliance must connect directly
+# (the ALCF proxy times out ~15min and kills large-P compiles).
+unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy
 RESULTS_FILE="$DECODE_DIR/e2e_verification_results.txt"
 
 exec > >(tee "$DECODE_DIR/e2e_verification_term_out.txt") 2>&1
@@ -33,10 +43,14 @@ declare -A TPR
 # ---------------------------------------------------------------------------
 
 run_prefill() {
-    local label="$1" P="$2" dim="$3" seq_len="$4" ffn_dim="$5" layer_num="$6"
+    # input_tokens = ACTUAL prompt length (e.g. 4096 / 2048).
+    # seq_len = padded kernel sequence (ceil(input_tokens/P)*P), needed for
+    # tile distribution. TPR is reported against actual input tokens, NOT
+    # padded seq_len, so the number reflects user-facing throughput.
+    local label="$1" P="$2" dim="$3" seq_len="$4" ffn_dim="$5" layer_num="$6" input_tokens="$7"
     echo ""
     echo "=========================================="
-    echo "PREFILL $label  P=$P  dim=$dim  seq_len=$seq_len  ffn=$ffn_dim  layers=$layer_num"
+    echo "PREFILL $label  P=$P  dim=$dim  seq_len=$seq_len  ffn=$ffn_dim  layers=$layer_num  input_tokens=$input_tokens"
     echo "=========================================="
     cd "$PREFILL_DIR"
     python compile.py "$P" "$dim" "$seq_len" "$ffn_dim" 1 1 "$dim" false
@@ -53,22 +67,24 @@ run_prefill() {
     time_ms=$(echo "$output" | grep -E "^Time:" | grep -oE '[0-9]+(\.[0-9]+)?' | head -1)
     if [ -n "$time_ms" ]; then
         local tpr
-        tpr=$(python3 -c "print(f'{$seq_len / ($time_ms * 1e-3 * $layer_num):.2f}')")
+        tpr=$(python3 -c "print(f'{$input_tokens / ($time_ms * 1e-3 * $layer_num):.2f}')")
         TPR["$label"]="$tpr"
-        echo ">>> $label TPR: $tpr tok/s"
+        echo ">>> $label TPR: $tpr tok/s  (input_tokens=$input_tokens, seq_len_padded=$seq_len)"
     else
         TPR["$label"]="FAILED"; echo ">>> Could not parse Time"
     fi
 }
 
 run_decode() {
-    local label="$1" P="$2" dim="$3" seq_len="$4" ffn_dim="$5" group_num="$6" layer_num="$7"
+    # valid_kv (8th arg) = actual KV cache size, e.g. 4096. Score entries past
+    # this index are masked in softmax so output reflects only real KV slots.
+    local label="$1" P="$2" dim="$3" seq_len="$4" ffn_dim="$5" group_num="$6" layer_num="$7" valid_kv="$8"
     echo ""
     echo "=========================================="
-    echo "DECODE  $label  P=$P  dim=$dim  seq_len=$seq_len  ffn=$ffn_dim  group=$group_num  layers=$layer_num"
+    echo "DECODE  $label  P=$P  dim=$dim  seq_len=$seq_len  valid_kv=$valid_kv  ffn=$ffn_dim  group=$group_num  layers=$layer_num"
     echo "=========================================="
     cd "$DECODE_DIR"
-    python compile.py "$P" 1 "$dim" 1 1 "$dim" "$seq_len" "$ffn_dim" "$group_num" false
+    python compile.py "$P" 1 "$dim" 1 1 "$dim" "$seq_len" "$ffn_dim" "$group_num" false "$valid_kv"
     if [ $? -ne 0 ]; then
         TPR["$label"]="COMPILE_FAILED"; echo ">>> COMPILE FAILED"; return
     fi
@@ -104,19 +120,19 @@ else:
 # LLaMA3-8B  (P=660 prefill, P=360 decode)
 # ---------------------------------------------------------------------------
 
-run_prefill "8B_prefill_4k"  660 4620 4620 14520 32   # 4096-input: ceil(4096/660)*660=4620
-run_prefill "8B_prefill_2k"  660 4620 2640 14520 32   # 2048-input: ceil(2048/660)*660=2640
-run_decode  "8B_decode_4k"   360 4320 4320 14400 20 32 # 4096 KV:   ceil(4096/360)*360=4320
-run_decode  "8B_decode_2k"   360 4320 2160 14400 20 32 # 2048 KV:   ceil(2048/360)*360=2160
+run_prefill "8B_prefill_4k"  660 4620 4620 14520 32 4096   # 4096-input: ceil(4096/660)*660=4620
+run_prefill "8B_prefill_2k"  660 4620 2640 14520 32 2048   # 2048-input: ceil(2048/660)*660=2640
+run_decode  "8B_decode_4k"   360 4320 4320 14400 20 32 4096  # 4096 KV (kernel sized to 4320, mask suffix)
+run_decode  "8B_decode_2k"   360 4320 2160 14400 20 32 2048  # 2048 KV (kernel sized to 2160, mask suffix)
 
 # ---------------------------------------------------------------------------
 # LLaMA2-13B  (P=750 prefill, P=375 decode)
 # ---------------------------------------------------------------------------
 
-run_prefill "13B_prefill_4k" 750 5250 4500 14250 40   # 4096-input: ceil(4096/750)*750=4500
-run_prefill "13B_prefill_2k" 750 5250 2250 14250 40   # 2048-input: ceil(2048/750)*750=2250
-run_decode  "13B_decode_4k"  375 5250 4125 13875 15 40 # 4096 KV:   ceil(4096/375)*375=4125
-run_decode  "13B_decode_2k"  375 5250 2250 13875 15 40 # 2048 KV:   ceil(2048/375)*375=2250
+run_prefill "13B_prefill_4k" 750 5250 4500 14250 40 4096   # 4096-input: ceil(4096/750)*750=4500
+run_prefill "13B_prefill_2k" 750 5250 2250 14250 40 2048   # 2048-input: ceil(2048/750)*750=2250
+run_decode  "13B_decode_4k"  375 5250 4125 13875 15 40 4096  # 4096 KV (kernel sized to 4125, mask suffix)
+run_decode  "13B_decode_2k"  375 5250 2250 13875 15 40 2048  # 2048 KV (kernel sized to 2250, mask suffix)
 
 # ---------------------------------------------------------------------------
 # Results

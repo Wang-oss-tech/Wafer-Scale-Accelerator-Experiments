@@ -11,15 +11,15 @@ Formula: E2E = new_tokens / (input_tokens/prefill_TPR + new_tokens/decode_TPR)
 +---------------------------+---------+---------+------------------+
 | Kernel                    | Grid    | seq_len | TPR (tok/s)      |
 +---------------------------+---------+---------+------------------+
-| LLaMA3-8B  prefill 4K-ctx | 660x660 |    4620 | 27922.83
-| LLaMA3-8B  prefill 2K-ctx | 660x660 |    2640 | 17732.40
-| LLaMA3-8B  decode  4K-ctx | 360x360 |    4320 | 2255.6
-| LLaMA3-8B  decode  2K-ctx | 360x360 |    2160 | 2300.2
+| LLaMA3-8B  prefill 4K-ctx | 660x660 |    4620 | 24728.09
+| LLaMA3-8B  prefill 2K-ctx | 660x660 |    2640 | 13736.85
+| LLaMA3-8B  decode  4K-ctx | 360x360 |    4320 | 2270.6
+| LLaMA3-8B  decode  2K-ctx | 360x360 |    2160 | 2295.3
 +---------------------------+---------+---------+------------------+
-| LLaMA2-13B prefill 4K-ctx | 750x750 |    4500 | 20511.98
-| LLaMA2-13B prefill 2K-ctx | 750x750 |    2250 | 11113.97
-| LLaMA2-13B decode  4K-ctx | 375x375 |    4125 | 1761.5
-| LLaMA2-13B decode  2K-ctx | 375x375 |    2250 | 1780.9
+| LLaMA2-13B prefill 4K-ctx | 750x750 |    4500 | 18566.53
+| LLaMA2-13B prefill 2K-ctx | 750x750 |    2250 | 10148.86
+| LLaMA2-13B decode  4K-ctx | 375x375 |    4125 | 1756.7
+| LLaMA2-13B decode  2K-ctx | 375x375 |    2250 | 1773.7
 +---------------------------+---------+---------+------------------+
 
 --- E2E Throughput (tok/s) ---
@@ -27,13 +27,13 @@ Formula: E2E = new_tokens / (input_tokens/prefill_TPR + new_tokens/decode_TPR)
 +----------------+-------------+----------------+------------------+------------------+
 | Model          | Scenario    |   Ours (tok/s) |   Paper (tok/s)  | Kernel used      |
 +----------------+-------------+----------------+------------------+------------------+
-| LLaMA3-8B      | 2048in/128  | 747.9 | 764.4  | 2K prefill + 2K decode |
-| LLaMA3-8B      | 4096in/128  | 629.2 | 604.4  | 4K prefill + 4K decode |
-| LLaMA3-8B      | 2048in/2048 | 2036.1 | 2370.3 | 2K prefill + 2K decode |
-| LLaMA3-8B      | 4096in/4096 | 2087.0 | 2459.0 | 4K prefill + 4K decode |
+| LLaMA3-8B      | 2048in/128  | 624.8 | 764.4  | 2K prefill + 2K decode |
+| LLaMA3-8B      | 4096in/128  | 576.5 | 604.4  | 4K prefill + 4K decode |
+| LLaMA3-8B      | 2048in/2048 | 1966.7 | 2370.3 | 2K prefill + 2K decode |
+| LLaMA3-8B      | 4096in/4096 | 2079.6 | 2459.0 | 4K prefill + 4K decode |
 +----------------+-------------+----------------+------------------+------------------+
-| LLaMA2-13B     | 2048in/128  | 499.7 | 473.9  | 2K prefill + 2K decode |
-| LLaMA2-13B     | 4096in/128  | 470.0 | 414.0  | 4K prefill + 4K decode |
-| LLaMA2-13B     | 2048in/2048 | 1534.9 | 1690.3 | 2K prefill + 2K decode |
-| LLaMA2-13B     | 4096in/4096 | 1622.2 | 1826.0 | 4K prefill + 4K decode |
+| LLaMA2-13B     | 2048in/128  | 467.2 | 473.9  | 2K prefill + 2K decode |
+| LLaMA2-13B     | 4096in/128  | 436.2 | 414.0  | 4K prefill + 4K decode |
+| LLaMA2-13B     | 2048in/2048 | 1509.8 | 1690.3 | 2K prefill + 2K decode |
+| LLaMA2-13B     | 4096in/4096 | 1604.9 | 1826.0 | 4K prefill + 4K decode |
 +----------------+-------------+----------------+------------------+------------------+

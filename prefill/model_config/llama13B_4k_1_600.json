@@ -1,11 +1,12 @@
 {
-    "P": 600,
-    "bsz": 1,
-    "dim": 5400,
-    "n_heads": 1,
-    "n_kv_heads": 1,
-    "head_dim": 5400,
-    "seq_len": 4200,
-    "ffn_dim": 14400,
-    "layer_num": 40
+  "P": 600,
+  "bsz": 1,
+  "dim": 5400,
+  "n_heads": 1,
+  "n_kv_heads": 1,
+  "head_dim": 5400,
+  "seq_len": 4200,
+  "ffn_dim": 14400,
+  "layer_num": 40,
+  "input_tokens": 4096
 }

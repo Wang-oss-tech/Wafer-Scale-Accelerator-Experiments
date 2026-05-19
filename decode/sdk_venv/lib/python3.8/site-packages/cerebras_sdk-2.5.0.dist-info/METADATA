@@ -1,0 +1,39 @@
+Metadata-Version: 2.1
+Name: cerebras-sdk
+Version: 2.5.0
+Summary: Cerebras Wafer Scale Cluster SDK
+Home-page: https://cerebras.net/
+Author: Cerebras Systems
+Author-email: support@cerebras.net
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Science/Research
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Classifier: Topic :: Software Development
+Classifier: Topic :: Software Development :: Libraries
+Classifier: Topic :: System :: Hardware
+Classifier: License :: OSI Approved :: BSD License
+Classifier: Programming Language :: Python :: 3
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: cerebras-appliance (==2.5.0)
+
+# cerebras_sdk
+
+[![PyPI Version](https://img.shields.io/pypi/v/cerebras_sdk)](https://pypi.org/project/cerebras_sdk/)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/cerebras_sdk)](https://pypi.org/project/cerebras_sdk/)
+[![Discord](https://img.shields.io/discord/1085960591052644463)](https://discord.gg/ZqvYS2e2rY)
+[![PyPI - Downloads](https://img.shields.io/pypi/dm/cerebras_sdk)](https://pypi.org/project/cerebras_sdk/#files)
+
+The cerebras_sdk package is a component of Cerebras's Wafer-Scale cluster software stack, offering a framework for kernel development.
+
+* **Website**: https://cerebras.net/
+* **Documentation**: https://sdk.cerebras.net/
+* **Support**: support@cerebras.net
+* **Discord**: https://discord.gg/ZqvYS2e2rY
+
+## Installation
+
+```bash
+pip install cerebras_sdk
+```
